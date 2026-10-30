@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Flame, Clock, Tag, Plus, Trash2 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

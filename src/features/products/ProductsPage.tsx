@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Boxes, Package, Star, Search, Pencil, Trash2, MoreHorizontal, TrendingUp } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
