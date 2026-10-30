@@ -14,6 +14,11 @@ export default defineConfig({
     host: '0.0.0.0',
     strictPort: true,
   },
+  preview: {
+    port: 4173,
+    host: '0.0.0.0',
+    allowedHosts: ['ema-store-web.onrender.com', '.onrender.com'],
+  },
   build: {
     rollupOptions: {
       output: {
