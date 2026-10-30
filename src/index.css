@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Ethiopic:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --brand-50: #edf9f2;
+  --brand-100: #d8f1e4;
+  --brand-500: #1b9b5a;
+  --brand-600: #16814d;
+  --brand-700: #0f6b3d;
+  --brand-950: rgba(27, 155, 90, 0.12);
+  --yellow-500: #f5b700;
+  --warning-500: #f59e0b;
+  --danger-500: #d93025;
+  --surface: #f8fafc;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+html {
+  font-family: 'Inter', 'Noto Sans Ethiopic', sans-serif;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@layer base {
+  * {
+    @apply box-border;
+  }
+
+  body {
+    @apply bg-slate-100 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  }
+
+  a {
+    @apply no-underline;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
