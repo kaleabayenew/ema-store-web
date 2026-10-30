@@ -3,12 +3,15 @@ import api from '@/lib/api'
 // Admin login - uses real backend API
 export async function loginWithUsername(payload: LoginPayload): Promise<AuthSession> {
   try {
+    console.log('[Web Auth] Login attempt for:', payload.username);
+    
     // Backend expects { email, password } for admin login
     const response = await api.post('/auth/login', {
       email: payload.username,
       password: payload.password,
     })
 
+    console.log('[Web Auth] Login response received:', response.status);
     const backendData = response.data
 
     // Transform backend response to frontend format
@@ -28,9 +31,15 @@ export async function loginWithUsername(payload: LoginPayload): Promise<AuthSess
       requiresOtp: false, // Admin login may not require OTP
     }
 
+    console.log('[Web Auth] Login successful for user:', user.name);
     return session
-  } catch (err) {
-    console.error('Login error:', err)
+  } catch (err: any) {
+    console.error('[Web Auth] Login error:', err);
+    console.error('[Web Auth] Error response:', err.response?.data);
+    
+    if (err.response?.data?.message) {
+      throw new Error(err.response.data.message);
+    }
     throw new Error('Login failed. Please check your credentials.')
   }
 }
