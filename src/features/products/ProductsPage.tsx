@@ -78,7 +78,7 @@ export function ProductsPage() {
       const approved = data.filter((p) => p.status === 'APPROVED').length
       const pending  = data.filter((p) => p.status === 'PENDING').length
       const avgRating = data.length > 0
-        ? parseFloat((data.reduce((s, p) => s + (p.ratingAvg || 0), 0) / data.length).toFixed(1))
+        ? parseFloat((data.reduce((s, p) => s + (Number(p.ratingAvg) || 0), 0) / data.length).toFixed(1))
         : 0
 
       setStats({ total, approved, pending, avgRating })
@@ -378,10 +378,10 @@ export function ProductsPage() {
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{p.soldCount}</td>
                     {/* Rating */}
                     <td className="px-4 py-3">
-                      {p.ratingAvg > 0 ? (
+                      {Number(p.ratingAvg) > 0 ? (
                         <span className="flex items-center gap-1 text-amber-600">
                           <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                          {p.ratingAvg.toFixed(1)}
+                          {Number(p.ratingAvg).toFixed(1)}
                         </span>
                       ) : (
                         <span className="text-slate-400">—</span>
