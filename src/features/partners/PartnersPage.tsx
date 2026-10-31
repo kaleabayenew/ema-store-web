@@ -1,43 +1,95 @@
-import { useState } from 'react'
-import { Building2, CheckCircle2, Clock, Star, Search, MoreHorizontal } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Building2, CheckCircle2, Clock, Star, Search, MoreHorizontal, Loader2, AlertCircle } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import api from '@/lib/api'
 
-const stats = [
-  { label: 'Total partners',   value: '284',   delta: '+7.4%',  tone: 'success', icon: Building2 },
-  { label: 'Approved',         value: '241',   delta: '+5.2%',  tone: 'success', icon: CheckCircle2 },
-  { label: 'Pending review',   value: '31',    delta: '+14.8%', tone: 'warning', icon: Clock },
-  { label: 'Avg. rating',      value: '4.6',   delta: '+0.2',   tone: 'info',    icon: Star },
-]
-
-const partners = [
-  { id: 'P-001', shop: 'Aster Mart',        owner: 'Aster Bekele',   subCity: 'Bole',    products: 142, revenue: 'ETB 284K', status: 'APPROVED',  rating: 4.8 },
-  { id: 'P-002', shop: 'Kebede Superstore', owner: 'Kebede Girma',   subCity: 'Arada',   products: 87,  revenue: 'ETB 156K', status: 'APPROVED',  rating: 4.5 },
-  { id: 'P-003', shop: 'Tigist Fashions',   owner: 'Tigist Alemu',   subCity: 'Yeka',    products: 54,  revenue: 'ETB 92K',  status: 'PENDING',   rating: 0 },
-  { id: 'P-004', shop: 'Biruk Electronics', owner: 'Biruk Mesfin',   subCity: 'Kirkos',  products: 211, revenue: 'ETB 518K', status: 'APPROVED',  rating: 4.7 },
-  { id: 'P-005', shop: 'Selam Crafts',      owner: 'Selam Haile',    subCity: 'Lideta',  products: 39,  revenue: 'ETB 67K',  status: 'PENDING',   rating: 0 },
-  { id: 'P-006', shop: 'Dawit Foods',       owner: 'Dawit Tadesse',  subCity: 'Nifas',   products: 98,  revenue: 'ETB 178K', status: 'APPROVED',  rating: 4.3 },
-  { id: 'P-007', shop: 'Rahel Beauty',      owner: 'Rahel Kebede',   subCity: 'Bole',    products: 73,  revenue: 'ETB 134K', status: 'SUSPENDED', rating: 3.1 },
-  { id: 'P-008', shop: 'Henok Sports',      owner: 'Henok Haile',    subCity: 'Kazanch', products: 61,  revenue: 'ETB 112K', status: 'APPROVED',  rating: 4.6 },
-]
+interface Partner {
+  id: string
+  shop: string
+  owner: string
+  subCity: string
+  products: number
+  revenue: string
+  rating: number
+  status: 'APPROVED' | 'PENDING' | 'SUSPENDED'
+  phone?: string
+  email?: string
+}
 
 const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'default'> = {
   APPROVED:  'success',
   PENDING:   'warning',
   SUSPENDED: 'danger',
-  REJECTED:  'danger',
+  REJECTED: 'danger',
 }
 
 export function PartnersPage() {
+  const [partners, setPartners] = useState<Partner[]>([])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'All' | 'APPROVED' | 'PENDING' | 'SUSPENDED'>('All')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0, avgRating: 0 })
+
+  // Fetch partners from backend
+  const fetchPartners = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await api.get('/admin/partners')
+      const data = (response.data.partners ?? []) as Partner[]
+      setPartners(data)
+
+      const total = data.length
+      const approved = data.filter((p) => p.status === 'APPROVED').length
+      const pending = data.filter((p) => p.status === 'PENDING').length
+      const avgRating = data.length > 0
+        ? parseFloat((data.reduce((s, p) => s + (p.rating || 0), 0) / data.length).toFixed(1))
+        : 0
+
+      setStats({ total, approved, pending, avgRating })
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? 'Failed to load partners')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchPartners()
+  }, [])
 
   const filtered = partners.filter((p) => {
     const matchSearch = p.shop.toLowerCase().includes(search.toLowerCase()) || p.owner.toLowerCase().includes(search.toLowerCase())
     const matchFilter = filter === 'All' || p.status === filter
     return matchSearch && matchFilter
   })
+
+  if (loading && partners.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-brand-600" />
+          <p className="mt-4 text-sm text-slate-500">Loading partners…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error && partners.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-10 w-10 text-red-500" />
+          <p className="mt-4 text-sm text-slate-500">{error}</p>
+          <Button variant="outline" className="mt-4" onClick={fetchPartners}>Retry</Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -47,20 +99,28 @@ export function PartnersPage() {
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Partners</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">Export</Button>
+          <Button variant="outline" onClick={fetchPartners} disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Refresh
+          </Button>
           <Button>Add partner</Button>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map(({ label, value, delta, tone, icon: Icon }) => (
+        {[
+          { label: 'Total partners', value: stats.total,    delta: '',   tone: 'success', icon: Building2 },
+          { label: 'Approved',       value: stats.approved, delta: '',   tone: 'success', icon: CheckCircle2 },
+          { label: 'Pending review', value: stats.pending,   delta: '',   tone: 'warning', icon: Clock },
+          { label: 'Avg. rating',    value: stats.avgRating, delta: '',   tone: 'info',    icon: Star },
+        ].map(({ label, value, delta, tone, icon: Icon }) => (
           <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">{label}</span>
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-300"><Icon className="h-4 w-4" /></span>
             </div>
             <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-            <Badge variant={tone as 'success' | 'info' | 'warning'} className="mt-2">{delta}</Badge>
+            {delta && <Badge variant={tone as 'success' | 'info' | 'warning'} className="mt-2">{delta}</Badge>}
           </div>
         ))}
       </div>
@@ -82,6 +142,12 @@ export function PartnersPage() {
           </div>
         </div>
 
+        {error && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">
+            {error} — showing cached data.
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -92,6 +158,13 @@ export function PartnersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
+                    No partners found.
+                  </td>
+                </tr>
+              )}
               {filtered.map((p) => (
                 <tr key={p.id} className="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
                   <td className="px-4 py-3">
@@ -99,7 +172,7 @@ export function PartnersPage() {
                       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-sm font-bold text-amber-700 dark:bg-amber-950 dark:text-amber-300">{p.shop.charAt(0)}</div>
                       <div>
                         <p className="font-medium text-slate-900 dark:text-slate-100">{p.shop}</p>
-                        <p className="text-xs text-slate-400">{p.id}</p>
+                        <p className="text-xs text-slate-400">{p.id.slice(0, 8)}</p>
                       </div>
                     </div>
                   </td>

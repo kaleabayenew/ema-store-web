@@ -113,7 +113,7 @@ export function ProductsPage() {
         formData.append('file', data.imageFile)
         formData.append('folder', 'products')
         try {
-          const uploadResponse = await api.post('/upload', formData, {
+          const uploadResponse = await api.post('/uploads', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           })
           imageUrl = uploadResponse.data.url
@@ -145,7 +145,7 @@ export function ProductsPage() {
         formData.append('file', data.imageFile)
         formData.append('folder', 'products')
         try {
-          const uploadResponse = await api.post('/upload', formData, {
+          const uploadResponse = await api.post('/uploads', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           })
           imageUrl = uploadResponse.data.url
