@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Boxes, Package, Star, Search, Pencil, Trash2, Loader2, AlertCircle } from 'lucide-react'
+import { Boxes, Package, Star, Search, Pencil, Trash2, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -50,11 +50,16 @@ const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'default'
 
 export function ProductsPage() {
   const [products, setProducts]     = useState<Product[]>([])
+  const [total, setTotal]           = useState(0)
+  const [page, setPage]             = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [categories, setCategories] = useState<Array<{ id: string; name_en: string }>>([])
   const [search, setSearch]         = useState('')
   const [filter, setFilter]         = useState<FilterStatus>('All')
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState<string | null>(null)
+
+  const PAGE_SIZE = 15
 
   const [showAddDialog, setShowAddDialog]       = useState(false)
   const [showEditDialog, setShowEditDialog]     = useState(false)
@@ -70,18 +75,21 @@ export function ProductsPage() {
     setLoading(true)
     setError(null)
     try {
-      const response = await api.get('/products')
+      const response = await api.get('/products', {
+        params: { search, status: filter === 'All' ? undefined : filter, page, limit: PAGE_SIZE },
+      })
       const data = (response.data.products ?? []) as Product[]
       setProducts(data)
+      setTotal(response.data.total ?? data.length)
+      setTotalPages(response.data.totalPages ?? 1)
 
-      const total    = data.length
-      const approved = data.filter((p) => p.status === 'APPROVED').length
-      const pending  = data.filter((p) => p.status === 'PENDING').length
-      const avgRating = data.length > 0
-        ? parseFloat((data.reduce((s, p) => s + (Number(p.ratingAvg) || 0), 0) / data.length).toFixed(1))
-        : 0
-
-      setStats({ total, approved, pending, avgRating })
+      // Stats: backend returns totals across all pages
+      setStats({
+        total:    response.data.total ?? data.length,
+        approved: response.data.approved ?? data.filter((p) => p.status === 'APPROVED').length,
+        pending:  response.data.pending ?? data.filter((p) => p.status === 'PENDING').length,
+        avgRating: response.data.avgRating ?? 0,
+      })
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Failed to load products')
     } finally {
@@ -101,7 +109,18 @@ export function ProductsPage() {
   useEffect(() => {
     fetchProducts()
     fetchCategories()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, filter])
+
+  // Debounced search resets to page 1
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (page !== 1) setPage(1)
+      else fetchProducts()
+    }, search ? 400 : 0)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
 
   // ── Mutations ─────────────────────────────────────────────────────────────
 
@@ -196,15 +215,8 @@ export function ProductsPage() {
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
-  const filtered = products.filter((p) => {
-    const q = search.toLowerCase()
-    const matchSearch =
-      p.nameEn.toLowerCase().includes(q) ||
-      (p.categoryName ?? '').toLowerCase().includes(q) ||
-      (p.sku ?? '').toLowerCase().includes(q)
-    const matchFilter = filter === 'All' || p.status === filter
-    return matchSearch && matchFilter
-  })
+  // Filtering (search + status) is handled by the backend, so we render
+  // the current page's `products` directly.
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -313,7 +325,7 @@ export function ProductsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filtered.length === 0 && (
+              {products.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
                     <Package className="mx-auto h-8 w-8 mb-2" />
@@ -321,7 +333,7 @@ export function ProductsPage() {
                   </td>
                 </tr>
               )}
-              {filtered.map((p) => {
+              {products.map((p) => {
                 const hasDiscount = p.discountCents != null && p.discountCents > 0 && p.discountCents < p.priceCents
                 const finalPrice = hasDiscount ? (p.discountCents as number) : p.priceCents
                 return (
@@ -410,8 +422,27 @@ export function ProductsPage() {
             </tbody>
           </table>
         </div>
-        <div className="border-t border-slate-200 px-4 py-3 text-sm text-slate-500 dark:border-slate-800">
-          Showing {filtered.length} of {products.length} products
+        <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+          <span className="text-sm text-slate-500">
+            {loading
+              ? 'Loading…'
+              : `Showing ${products.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–${(page - 1) * PAGE_SIZE + products.length} of ${total} products`}
+          </span>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => setPage(page - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+                <span className="ml-1">Prev</span>
+              </Button>
+              <span className="text-sm text-slate-500">
+                Page <span className="font-semibold text-slate-800 dark:text-slate-100">{page}</span> of {totalPages}
+              </span>
+              <Button variant="outline" size="sm" disabled={page >= totalPages || loading} onClick={() => setPage(page + 1)}>
+                <span className="mr-1">Next</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
