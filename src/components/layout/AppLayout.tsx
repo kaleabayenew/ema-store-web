@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 
+import { ConnectionBanner } from '@/components/ui/ConnectionBanner'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { PageLoader } from '@/components/ui/PageLoader'
 import { Breadcrumbs } from './Breadcrumbs'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
@@ -18,10 +21,21 @@ export function AppLayout() {
           <Breadcrumbs />
 
           <main className="flex-1 overflow-auto p-4 md:p-6">
-            <Outlet />
+            {/*
+              ErrorBoundary catches any render/lifecycle crash inside a page.
+              Suspense handles lazy-loaded page chunks (future code-splitting).
+            */}
+            <ErrorBoundary>
+              <Suspense fallback={<PageLoader />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           </main>
         </div>
       </div>
+
+      {/* Global connection-error banner (bottom-center, dismissible) */}
+      <ConnectionBanner />
     </div>
   )
 }

@@ -1,68 +1,92 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Flame, Clock, Tag, Plus, Trash2 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { api } from '@/lib/api'
 
-const stats = [
-  { label: 'Active deals', value: '3', delta: '+1', tone: 'success', icon: Flame },
-  { label: 'Total views', value: '12.4K', delta: '+18.2%', tone: 'info', icon: Clock },
-  { label: 'Redeemed coupons', value: '842', delta: '+12.6%', tone: 'warning', icon: Tag },
-]
+interface FlashDeal {
+  id: string
+  title: string
+  description: string | null
+  discount_percent: number
+  starts_at: string
+  ends_at: string
+  image_url: string | null
+  is_active: boolean
+  created_at: string
+}
 
-const mockDeals = [
-  {
-    id: 'FD-001',
-    title: '50% Off Fashion Week',
-    description: 'Get 50% off on all fashion items from top Ethiopian designers!',
-    discountPercent: 50,
-    startsAt: '2026-10-22T10:00:00Z',
-    endsAt: '2026-10-23T10:00:00Z',
-    imageUrl: 'https://via.placeholder.com/400x200/1B9B5A/FFFFFF?text=Fashion',
-    productCount: 24,
-    categoryIds: ['fashion'],
-    isActive: true,
-    createdAt: '2026-10-22T08:00:00Z',
-  },
-  {
-    id: 'FD-002',
-    title: 'Electronics Bonanza',
-    description: 'Up to 30% off on smartphones, headphones, and accessories!',
-    discountPercent: 30,
-    startsAt: '2026-10-22T08:00:00Z',
-    endsAt: '2026-10-22T20:00:00Z',
-    imageUrl: 'https://via.placeholder.com/400x200/3B82F6/FFFFFF?text=Electronics',
-    productCount: 18,
-    categoryIds: ['electronics'],
-    isActive: true,
-    createdAt: '2026-10-21T10:00:00Z',
-  },
-  {
-    id: 'FD-003',
-    title: 'Home Essentials Sale',
-    description: '25% off on home and kitchen essentials.',
-    discountPercent: 25,
-    startsAt: '2026-10-20T08:00:00Z',
-    endsAt: '2026-10-21T08:00:00Z',
-    imageUrl: 'https://via.placeholder.com/400x200/27C470/FFFFFF?text=Home',
-    productCount: 35,
-    categoryIds: ['home'],
-    isActive: false,
-    createdAt: '2026-10-19T12:00:00Z',
-  },
-]
+interface DealForm {
+  title: string
+  description: string
+  discount_percent: string
+  starts_at: string
+  ends_at: string
+  image_url: string
+}
+
+const emptyForm: DealForm = {
+  title: '',
+  description: '',
+  discount_percent: '',
+  starts_at: '',
+  ends_at: '',
+  image_url: '',
+}
+
+// Value format required by <input type="datetime-local">
+const toLocalInput = (d: Date) => {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const inputClass =
+  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100'
 
 export function FlashDealsPage() {
-  const [deals, setDeals] = useState(mockDeals)
+  const [deals, setDeals] = useState<FlashDeal[]>([])
+  const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [filter, setFilter] = useState<'All' | 'Active' | 'Ended'>('All')
+  const [form, setForm] = useState<DealForm>(emptyForm)
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  useEffect(() => {
+    loadDeals()
+  }, [])
+
+  const loadDeals = async () => {
+    try {
+      setLoading(true)
+      const response = await api.get('/flash-deals')
+      setDeals(response.data.deals || [])
+    } catch (error) {
+      console.error('Failed to load flash deals:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredDeals = deals.filter((deal) => {
     if (filter === 'All') return true
-    if (filter === 'Active') return deal.isActive
-    if (filter === 'Ended') return !deal.isActive
+    if (filter === 'Active') return deal.is_active
+    if (filter === 'Ended') return !deal.is_active
     return true
   })
+
+  const stats = [
+    {
+      label: 'Active deals',
+      value: String(deals.filter((d) => d.is_active).length),
+      delta: '+0',
+      tone: 'success',
+      icon: Flame,
+    },
+    { label: 'Total views', value: '0', delta: '+0%', tone: 'info', icon: Clock },
+    { label: 'Redeemed coupons', value: '0', delta: '+0%', tone: 'warning', icon: Tag },
+  ]
 
   const formatTimeRemaining = (endsAt: string) => {
     const end = new Date(endsAt)
@@ -82,18 +106,91 @@ export function FlashDealsPage() {
     return `${hours}h ${minutes}m`
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this flash deal?')) {
-      setDeals(deals.filter((d) => d.id !== id))
+      try {
+        await api.delete(`/flash-deals/${id}`)
+        setDeals(deals.filter((d) => d.id !== id))
+      } catch (error) {
+        console.error('Failed to delete flash deal:', error)
+      }
     }
   }
 
-  const handleToggleActive = (id: string) => {
-    setDeals(
-      deals.map((d) =>
-        d.id === id ? { ...d, isActive: !d.isActive } : d
-      )
-    )
+  const handleToggleActive = async (id: string) => {
+    try {
+      const deal = deals.find((d) => d.id === id)
+      if (deal) {
+        await api.patch(`/flash-deals/${id}`, { is_active: !deal.is_active })
+        setDeals(
+          deals.map((d) =>
+            d.id === id ? { ...d, is_active: !d.is_active } : d
+          )
+        )
+      }
+    } catch (error) {
+      console.error('Failed to toggle flash deal:', error)
+    }
+  }
+
+  const openCreateDialog = () => {
+    const now = new Date()
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+    setForm({ ...emptyForm, starts_at: toLocalInput(now), ends_at: toLocalInput(tomorrow) })
+    setFormError(null)
+    setShowCreateDialog(true)
+  }
+
+  const closeCreateDialog = () => {
+    if (submitting) return
+    setShowCreateDialog(false)
+  }
+
+  const updateForm = (field: keyof DealForm, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }))
+    setFormError(null)
+  }
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const title = form.title.trim()
+    const discount = Number(form.discount_percent)
+    const start = new Date(form.starts_at)
+    const end = new Date(form.ends_at)
+
+    if (!title) return setFormError('Title is required.')
+    if (!Number.isInteger(discount) || discount < 1 || discount > 99) {
+      return setFormError('Discount must be a whole number from 1 to 99.')
+    }
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return setFormError('Please choose a start and end time.')
+    }
+    if (end <= start) return setFormError('End time must be after the start time.')
+    if (end <= new Date()) return setFormError('End time must be in the future.')
+
+    try {
+      setSubmitting(true)
+      setFormError(null)
+      await api.post('/flash-deals', {
+        title,
+        description: form.description.trim() || null,
+        discount_percent: discount,
+        starts_at: start.toISOString(),
+        ends_at: end.toISOString(),
+        image_url: form.image_url.trim() || null,
+        is_active: true,
+      })
+      setShowCreateDialog(false)
+      await loadDeals()
+    } catch (error) {
+      console.error('Failed to create flash deal:', error)
+      const message = (error as { response?: { data?: { message?: string } } })?.response?.data
+        ?.message
+      setFormError(message || 'Could not create the flash deal. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -105,7 +202,7 @@ export function FlashDealsPage() {
             Flash Deals
           </h1>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
+        <Button onClick={openCreateDialog}>
           <Plus className="mr-2 h-4 w-4" />
           Create Flash Deal
         </Button>
@@ -148,110 +245,206 @@ export function FlashDealsPage() {
           </div>
         </div>
 
-        <div className="divide-y divide-slate-100 dark:divide-slate-800">
-          {filteredDeals.map((deal) => (
-            <div key={deal.id} className="p-4">
-              <div className="flex gap-4">
-                {/* Deal Image */}
-                <div className="h-24 w-32 flex-shrink-0 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800">
-                  {deal.imageUrl ? (
-                    <img
-                      src={deal.imageUrl}
-                      alt={deal.title}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-slate-400">
-                      <Flame className="h-8 w-8" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Deal Info */}
-                <div className="flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">
-                          {deal.title}
-                        </h3>
-                        <Badge variant={deal.isActive ? 'success' : 'default'}>
-                          {deal.isActive ? 'Active' : 'Ended'}
-                        </Badge>
+        {loading ? (
+          <div className="p-12 text-center text-slate-500">
+            Loading flash deals...
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {filteredDeals.map((deal) => (
+              <div key={deal.id} className="p-4">
+                <div className="flex gap-4">
+                  {/* Deal Image */}
+                  <div className="h-24 w-32 flex-shrink-0 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800">
+                    {deal.image_url ? (
+                      <img
+                        src={deal.image_url}
+                        alt={deal.title}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-slate-400">
+                        <Flame className="h-8 w-8" />
                       </div>
-                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                        {deal.description}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleToggleActive(deal.id)}
-                      >
-                        {deal.isActive ? 'Pause' : 'Activate'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(deal.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </Button>
-                    </div>
+                    )}
                   </div>
 
-                  <div className="mt-3 flex items-center gap-6 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Tag className="h-4 w-4 text-brand-600" />
-                      <span className="text-slate-600 dark:text-slate-300">
-                        {deal.discountPercent}% off
-                      </span>
+                  {/* Deal Info */}
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                            {deal.title}
+                          </h3>
+                          <Badge variant={deal.is_active ? 'success' : 'default'}>
+                            {deal.is_active ? 'Active' : 'Ended'}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                          {deal.description}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleToggleActive(deal.id)}
+                        >
+                          {deal.is_active ? 'Pause' : 'Activate'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(deal.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-600" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-slate-400" />
-                      <span className="text-slate-600 dark:text-slate-300">
-                        {formatTimeRemaining(deal.endsAt)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-600 dark:text-slate-300">
-                        {deal.productCount} products
-                      </span>
+
+                    <div className="mt-3 flex items-center gap-6 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4 text-brand-600" />
+                        <span className="text-slate-600 dark:text-slate-300">
+                          {deal.discount_percent}% off
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-slate-400" />
+                        <span className="text-slate-600 dark:text-slate-300">
+                          {formatTimeRemaining(deal.ends_at)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
-        {filteredDeals.length === 0 && (
+        {!loading && filteredDeals.length === 0 && (
           <div className="p-12 text-center text-slate-500">
             No flash deals found
           </div>
         )}
       </div>
 
-      {/* Create Deal Dialog (placeholder) */}
+      {/* Create Deal Dialog */}
       {showCreateDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form
+            onSubmit={handleCreate}
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900"
+          >
+            <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
               Create Flash Deal
             </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
-              TODO: Implement flash deal creation form with title, description, discount, time range, and product/category selection.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="deal-title" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Title
+                </label>
+                <input
+                  id="deal-title"
+                  type="text"
+                  value={form.title}
+                  onChange={(e) => updateForm('title', e.target.value)}
+                  placeholder="Weekend mega sale"
+                  className={inputClass}
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label htmlFor="deal-description" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Description <span className="text-slate-400">(optional)</span>
+                </label>
+                <textarea
+                  id="deal-description"
+                  rows={3}
+                  value={form.description}
+                  onChange={(e) => updateForm('description', e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="deal-discount" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Discount (%)
+                </label>
+                <input
+                  id="deal-discount"
+                  type="number"
+                  min={1}
+                  max={99}
+                  step={1}
+                  value={form.discount_percent}
+                  onChange={(e) => updateForm('discount_percent', e.target.value)}
+                  placeholder="20"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="deal-start" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Starts at
+                  </label>
+                  <input
+                    id="deal-start"
+                    type="datetime-local"
+                    value={form.starts_at}
+                    onChange={(e) => updateForm('starts_at', e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="deal-end" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Ends at
+                  </label>
+                  <input
+                    id="deal-end"
+                    type="datetime-local"
+                    value={form.ends_at}
+                    onChange={(e) => updateForm('ends_at', e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="deal-image" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Image URL <span className="text-slate-400">(optional)</span>
+                </label>
+                <input
+                  id="deal-image"
+                  type="url"
+                  value={form.image_url}
+                  onChange={(e) => updateForm('image_url', e.target.value)}
+                  placeholder="https://..."
+                  className={inputClass}
+                />
+              </div>
+
+              {formError && (
+                <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                  {formError}
+                </p>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={closeCreateDialog} disabled={submitting}>
                 Cancel
               </Button>
-              <Button onClick={() => setShowCreateDialog(false)}>
-                Create
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Creating...' : 'Create'}
               </Button>
             </div>
-          </div>
+          </form>
         </div>
       )}
     </div>

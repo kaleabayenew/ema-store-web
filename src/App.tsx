@@ -2,11 +2,13 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import { SessionExpiredDialog } from './components/auth/SessionExpiredDialog'
 import { AppLayout } from './components/layout/AppLayout'
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { ApprovalsPage } from './features/approvals/ApprovalsPage'
 import { ForbiddenPage } from './features/auth/ForbiddenPage'
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage'
 import { LoginPage } from './features/auth/LoginPage'
 import { OtpPage } from './features/auth/OtpPage'
+import { BidControlPage } from './features/bids/BidControlPage'
 import { CustomersPage } from './features/customers/CustomersPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { DeliveryPage } from './features/delivery/DeliveryPage'
@@ -31,7 +33,8 @@ function App() {
   useAutoLogout()
 
   return (
-    <BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
       <SessionExpiredDialog />
       <Routes>
         {/* Public */}
@@ -57,6 +60,7 @@ function App() {
             <Route path="/ride"      element={<RidePage />} />
             <Route path="/marketing" element={<MarketingPage />} />
             <Route path="/flash-deals" element={<FlashDealsPage />} />
+            <Route path="/bids" element={<BidControlPage />} />
             <Route path="/support"   element={<SupportPage />} />
             <Route path="/delivery"  element={<DeliveryPage />} />
             <Route path="/finance"   element={<FinancePage />} />
@@ -78,6 +82,7 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 

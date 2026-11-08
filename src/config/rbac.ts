@@ -12,6 +12,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   '/ride':               ['SUPER_ADMIN', 'MANAGEMENT'],
   '/marketing':          ['SUPER_ADMIN', 'MANAGEMENT'],
   '/flash-deals':        ['SUPER_ADMIN', 'MANAGEMENT', 'MARKETING'],
+  '/bids':               ['SUPER_ADMIN', 'MANAGEMENT'],
   '/support':            ['SUPER_ADMIN', 'CUSTOMER_SUPPORT'],
   '/finance':            ['SUPER_ADMIN', 'FINANCE'],
   '/reports':            ['SUPER_ADMIN', 'PARTNER_MANAGER', 'PRODUCT_MANAGER', 'FINANCE'],

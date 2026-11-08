@@ -9,6 +9,9 @@ export async function loginWithUsername(payload: LoginPayload): Promise<AuthSess
     const response = await api.post('/auth/login', {
       email: payload.username,
       password: payload.password,
+    }, {
+      // Render cold starts can exceed the default 15s timeout — give login more room
+      timeout: 60000,
     })
 
     console.log('[Web Auth] Login response received:', response.status);

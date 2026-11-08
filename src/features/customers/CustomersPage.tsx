@@ -114,10 +114,15 @@ export function CustomersPage() {
   const [ordersCustomer, setOrdersCustomer] = useState<Customer | null>(null)
   const [orders, setOrders]                 = useState<Order[]>([])
   const [ordersLoading, setOrdersLoading]   = useState(false)
-  const [password, setPassword]             = useState<string | null>(null)
-  const [passwordLoading, setPasswordLoading] = useState(false)
-  const [resetCustomer, setResetCustomer]   = useState<Customer | null>(null)
-  const [resetCurrent, setResetCurrent]     = useState<string>('')
+
+  // PIN-gated password reveal (detail popup)
+  const [pwState, setPwState]       = useState<'locked' | 'verifying' | 'revealed' | 'hashed'>('locked')
+  const [pwPin, setPwPin]           = useState('')
+  const [pwPinError, setPwPinError] = useState('')
+  const [pwValue, setPwValue]       = useState<string | null>(null)
+
+  // Reset password popup
+  const [resetCustomer, setResetCustomer] = useState<Customer | null>(null)
   const [resetNew, setResetNew]             = useState<string | null>(null)
   const [resetting, setResetting]           = useState(false)
   const [resetSent, setResetSent]           = useState(false)
@@ -137,32 +142,42 @@ export function CustomersPage() {
     }
   }
 
-  // Fetch readable password when the detail popup opens
+  // Reset reveal state when the detail popup closes or changes customer
   useEffect(() => {
-    if (!selected) {
-      setPassword(null)
-      return
-    }
-    setPasswordLoading(true)
-    setPassword(null)
-    api.get<{ success: boolean; data: { password: string | null; phone: string } }>(`/customers/${selected.id}/password`)
-      .then((res) => setPassword(res.data.data.password))
-      .catch(() => setPassword(null))
-      .finally(() => setPasswordLoading(false))
+    setPwState('locked')
+    setPwPin('')
+    setPwPinError('')
+    setPwValue(null)
   }, [selected])
 
-  // Open the reset password popup (fetch current password first)
-  async function openResetPassword(customer: Customer) {
+  // Reveal password behind a PIN
+  async function revealPassword() {
+    if (!selected) return
+    setPwPinError('')
+    setPwState('verifying')
+    try {
+      const res = await api.get<{ success: boolean; data: { password: string | null; hashed: boolean; phone: string } }>(
+        `/customers/${selected.id}/password`,
+        { params: { pin: pwPin } },
+      )
+      const d = res.data.data
+      if (d.hashed || !d.password) {
+        setPwState('hashed')
+      } else {
+        setPwValue(d.password)
+        setPwState('revealed')
+      }
+    } catch (err: any) {
+      setPwState('locked')
+      setPwPinError(err.response?.status === 403 ? 'Incorrect PIN' : 'Failed to load')
+    }
+  }
+
+  // Open the reset password popup
+  function openResetPassword(customer: Customer) {
     setResetCustomer(customer)
     setResetNew(null)
     setResetSent(false)
-    setResetCurrent('Loading…')
-    try {
-      const res = await api.get<{ success: boolean; data: { password: string | null; phone: string } }>(`/customers/${customer.id}/password`)
-      setResetCurrent(res.data.data.password ?? '—')
-    } catch {
-      setResetCurrent('Unable to load')
-    }
   }
 
   // Generate a new password, persist it, and send via Telegram
@@ -175,7 +190,7 @@ export function CustomersPage() {
       setResetNew(res.data.data.newPassword)
       setResetSent(res.data.data.delivery.sent)
       // If the detail popup is open for the same customer, refresh its password too
-      if (selected?.id === resetCustomer.id) setPassword(res.data.data.newPassword)
+      if (selected?.id === resetCustomer.id) { setPwValue(res.data.data.newPassword); setPwState('revealed') }
       // Refresh the list so any derived state stays fresh
       fetchCustomers()
     } catch (err: any) {
@@ -534,25 +549,60 @@ export function CustomersPage() {
                 </div>
               ))}
 
-              {/* Password row (spans full width) */}
+              {/* Password row (spans full width) — PIN-gated reveal */}
               <div className="col-span-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-slate-400">Password</p>
-                  <button
-                    onClick={() => password && navigator.clipboard.writeText(password)}
-                    className="text-xs text-brand-600 hover:underline dark:text-brand-400"
-                  >
-                    Copy
-                  </button>
+                  {pwState === 'revealed' && pwValue && (
+                    <button
+                      onClick={() => navigator.clipboard.writeText(pwValue)}
+                      className="text-xs text-brand-600 hover:underline dark:text-brand-400"
+                    >
+                      Copy
+                    </button>
+                  )}
                 </div>
-                {passwordLoading ? (
+
+                {pwState === 'locked' && (
+                  <div className="mt-1 flex flex-col gap-2">
+                    <p className="font-mono text-sm font-semibold text-slate-500">•••••••• <span className="text-xs font-sans text-slate-400">(locked)</span></p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="Enter PIN"
+                        value={pwPin}
+                        onChange={(e) => setPwPin(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') revealPassword() }}
+                        className="w-28 rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm outline-none focus:border-brand-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                      <button
+                        onClick={revealPassword}
+                        disabled={!pwPin}
+                        className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                      >
+                        Reveal
+                      </button>
+                    </div>
+                    {pwPinError && <p className="text-xs text-red-500">{pwPinError}</p>}
+                  </div>
+                )}
+
+                {pwState === 'verifying' && (
                   <p className="mt-1 flex items-center gap-2 text-sm text-slate-400">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Verifying…
                   </p>
-                ) : password ? (
-                  <p className="mt-1 font-mono text-sm font-semibold text-slate-800 dark:text-slate-100">{password}</p>
-                ) : (
-                  <p className="mt-1 text-xs text-slate-400">No password on record. Use “Reset password” to generate one.</p>
+                )}
+
+                {pwState === 'revealed' && pwValue && (
+                  <p className="mt-1 font-mono text-sm font-semibold text-slate-800 dark:text-slate-100">{pwValue}</p>
+                )}
+
+                {pwState === 'hashed' && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Password is hashed and cannot be revealed. Use <span className="font-semibold">Reset password</span> to generate a new one.
+                  </p>
                 )}
               </div>
             </div>
@@ -716,11 +766,11 @@ export function CustomersPage() {
                 <span className="ml-2 text-xs text-slate-400">{resetCustomer.phone}</span>
               </p>
 
-              {/* Current password */}
+              {/* Current password note (PIN-protected — not auto-shown) */}
               <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
                 <p className="text-xs text-slate-400">Current password</p>
-                <p className="mt-1 font-mono text-sm font-semibold text-slate-800 dark:text-slate-100 break-all">
-                  {resetCurrent}
+                <p className="mt-1 text-xs text-slate-500">
+                  The current password is protected. Use <span className="font-semibold">Generate</span> below to create a new one — it will be sent to the customer on Telegram.
                 </p>
               </div>
 

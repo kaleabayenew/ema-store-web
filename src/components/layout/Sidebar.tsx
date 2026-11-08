@@ -1,5 +1,5 @@
 import {
-  BarChart3, Bell, Bike, Boxes, Building2, CreditCard, FileText, Flame,
+  BarChart3, Bell, Bike, Boxes, Building2, CreditCard, FileText, Flame, Gavel,
   LayoutDashboard, LogOut, MessageSquareText, PackageCheck,
   Settings, ShoppingCart, Sparkles, UserRoundCog, Users, Warehouse,
 } from 'lucide-react'
@@ -31,6 +31,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { title: 'Ride',       href: '/ride',      icon: Bike },
       { title: 'Marketing',  href: '/marketing', icon: Sparkles },
       { title: 'Flash Deals', href: '/flash-deals', icon: Flame },
+      { title: 'Bid Control', href: '/bids',        icon: Gavel },
       { title: 'Support',    href: '/support',   icon: MessageSquareText },
       { title: 'Delivery',   href: '/delivery',  icon: Warehouse },
       { title: 'Finance',    href: '/finance',   icon: CreditCard },
