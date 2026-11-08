@@ -43,29 +43,30 @@ interface OrderDetail extends Order {
   items: OrderItem[]
 }
 
-type FilterStatus = 'All' | 'PLACED' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED'
+type FilterStatus = 'All' | 'PENDING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
-  DELIVERED:  'success',
+  DELIVERED: 'success',
   IN_TRANSIT: 'info',
-  SHIPPED:    'info',
-  PACKED:     'warning',
+  SHIPPED: 'info',
+  PACKED: 'warning',
   PROCESSING: 'warning',
-  CONFIRMED:  'warning',
-  PLACED:     'default',
-  CANCELLED:  'danger',
-  REFUNDED:   'danger',
+  CONFIRMED: 'warning',
+  PENDING: 'default',
+  PLACED: 'default',
+  CANCELLED: 'danger',
+  REFUNDED: 'danger',
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  PLACED: 'Placed', CONFIRMED: 'Confirmed', PROCESSING: 'Processing',
+  PENDING: 'Pending', PLACED: 'Placed', CONFIRMED: 'Confirmed', PROCESSING: 'Processing',
   PACKED: 'Packed', SHIPPED: 'Shipped', IN_TRANSIT: 'In transit',
   DELIVERED: 'Delivered', CANCELLED: 'Cancelled', REFUNDED: 'Refunded',
 }
 
-const ALL_STATUSES = ['PLACED','CONFIRMED','PROCESSING','PACKED','SHIPPED','IN_TRANSIT','DELIVERED','CANCELLED','REFUNDED']
+const ALL_STATUSES = ['PLACED', 'CONFIRMED', 'PROCESSING', 'PACKED', 'SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED', 'REFUNDED']
 
 function formatCurrency(amount: number) {
   return `ETB ${amount.toLocaleString('en-ET', { minimumFractionDigits: 2 })}`
@@ -82,21 +83,21 @@ function shortId(id: string) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function OrdersPage() {
-  const [orders, setOrders]       = useState<Order[]>([])
-  const [total, setTotal]         = useState(0)
-  const [page, setPage]           = useState(1)
+  const [orders, setOrders] = useState<Order[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const [search, setSearch]       = useState('')
-  const [filter, setFilter]       = useState<FilterStatus>('All')
-  const [loading, setLoading]     = useState(true)
-  const [error, setError]         = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<FilterStatus>('All')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const [stats, setStats] = useState({
     total: 0, delivered: 0, inTransit: 0, cancelled: 0, totalRevenue: 0,
   })
 
   // Detail modal
-  const [detail, setDetail]             = useState<OrderDetail | null>(null)
+  const [detail, setDetail] = useState<OrderDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
 
@@ -106,7 +107,7 @@ export function OrdersPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await api.get('/admin/orders', {
+      const res = await api.get('/orders/admin', {
         params: {
           search,
           status: filter === 'All' ? undefined : filter,
@@ -118,10 +119,10 @@ export function OrdersPage() {
       setTotal(res.data.total ?? 0)
       setTotalPages(res.data.totalPages ?? 1)
       setStats({
-        total:        res.data.total ?? 0,
-        delivered:    res.data.delivered ?? 0,
-        inTransit:    res.data.inTransit ?? 0,
-        cancelled:    res.data.cancelled ?? 0,
+        total: res.data.total ?? 0,
+        delivered: res.data.delivered ?? 0,
+        inTransit: res.data.inTransit ?? 0,
+        cancelled: res.data.cancelled ?? 0,
         totalRevenue: res.data.totalRevenue ?? 0,
       })
     } catch (err: any) {
@@ -145,7 +146,7 @@ export function OrdersPage() {
     setDetail({ ...order, customerEmail: '', items: [] })
     setDetailLoading(true)
     try {
-      const res = await api.get<{ order: OrderDetail }>(`/admin/orders/${order.id}`)
+      const res = await api.get<{ order: OrderDetail }>(`/orders/admin/${order.id}`)
       setDetail(res.data.order)
     } catch {
       // keep basic info
@@ -157,7 +158,7 @@ export function OrdersPage() {
   async function changeStatus(orderId: string, status: string) {
     setUpdatingStatus(true)
     try {
-      await api.patch(`/admin/orders/${orderId}/status`, { status })
+      await api.patch(`/orders/admin/${orderId}/status`, { status })
       fetchOrders()
       if (detail?.id === orderId) setDetail((d) => d ? { ...d, status } : null)
     } catch (err: any) {
@@ -206,11 +207,11 @@ export function OrdersPage() {
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {[
-          { label: 'Total orders',   value: stats.total.toLocaleString(),                 icon: ShoppingCart, color: 'text-brand-600' },
-          { label: 'Delivered',      value: stats.delivered.toLocaleString(),              icon: CheckCircle2, color: 'text-emerald-600' },
-          { label: 'In transit',     value: stats.inTransit.toLocaleString(),              icon: Package,      color: 'text-blue-600' },
-          { label: 'Cancelled',      value: stats.cancelled.toLocaleString(),              icon: XCircle,      color: 'text-red-500' },
-          { label: 'Total revenue',  value: formatCurrency(stats.totalRevenue),            icon: TrendingUp,   color: 'text-violet-600' },
+          { label: 'Total orders', value: stats.total.toLocaleString(), icon: ShoppingCart, color: 'text-brand-600' },
+          { label: 'Delivered', value: stats.delivered.toLocaleString(), icon: CheckCircle2, color: 'text-emerald-600' },
+          { label: 'In transit', value: stats.inTransit.toLocaleString(), icon: Package, color: 'text-blue-600' },
+          { label: 'Cancelled', value: stats.cancelled.toLocaleString(), icon: XCircle, color: 'text-red-500' },
+          { label: 'Total revenue', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-violet-600' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between">
@@ -239,7 +240,7 @@ export function OrdersPage() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            {(['All', 'PLACED', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED'] as FilterStatus[]).map((f) => (
+            {(['All', 'PENDING', 'SHIPPED', 'DELIVERED', 'CANCELLED'] as FilterStatus[]).map((f) => (
               <button
                 key={f}
                 type="button"
@@ -360,13 +361,13 @@ export function OrdersPage() {
               {/* Info grid */}
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Customer',      value: detail.customerName },
-                  { label: 'Phone',         value: detail.customerPhone || '—' },
-                  { label: 'Email',         value: detail.customerEmail || '—' },
-                  { label: 'Payment',       value: detail.paymentMethod },
-                  { label: 'Order total',   value: formatCurrency(detail.totalAmount), highlight: true },
-                  { label: 'Date',          value: formatDate(detail.createdAt) },
-                  { label: 'Shipping',      value: detail.shippingAddress },
+                  { label: 'Customer', value: detail.customerName },
+                  { label: 'Phone', value: detail.customerPhone || '—' },
+                  { label: 'Email', value: detail.customerEmail || '—' },
+                  { label: 'Payment', value: detail.paymentMethod },
+                  { label: 'Order total', value: formatCurrency(detail.totalAmount), highlight: true },
+                  { label: 'Date', value: formatDate(detail.createdAt) },
+                  { label: 'Shipping', value: detail.shippingAddress },
                 ].map(({ label, value, highlight }) => (
                   <div key={label} className={`rounded-xl p-3 ${highlight ? 'col-span-2 bg-brand-50 dark:bg-brand-900/20' : 'bg-slate-50 dark:bg-slate-800'}`}>
                     <p className="text-xs text-slate-400">{label}</p>

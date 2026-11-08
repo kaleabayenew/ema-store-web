@@ -2,7 +2,7 @@ import axios from 'axios'
 
 import { useAuthStore } from '@/store/authStore'
 
-const baseURL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1'
+const baseURL = import.meta.env.VITE_API_URL ?? 'https://ema-store-backend.onrender.com/api/v1'
 
 export const api = axios.create({
   baseURL,
