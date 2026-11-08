@@ -6,6 +6,8 @@ import {
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useAlert, useConfirm } from '@/components/ui/ConfirmDialog'
+import { dateAfter, dateInFuture, isPositive, maxLength, required, validate } from '@/lib/validate'
 import api from '@/lib/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -63,6 +65,8 @@ const inputClass =
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function BidControlPage() {
+  const confirmDialog = useConfirm()
+  const alert = useAlert()
   const [bids, setBids]       = useState<Bid[]>([])
   const [total, setTotal]     = useState(0)
   const [loading, setLoading] = useState(true)
@@ -158,12 +162,17 @@ export function BidControlPage() {
     const start        = new Date(form.startsAt)
     const end          = new Date(form.endsAt)
 
-    if (!title)            return setFormError('Title is required.')
-    if (!form.productId)   return setFormError('Please select a product.')
-    if (!startPrice || startPrice <= 0) return setFormError('Starting price must be greater than 0.')
-    if (!minIncrement || minIncrement <= 0) return setFormError('Min increment must be greater than 0.')
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return setFormError('Choose valid start and end times.')
-    if (end <= start)      return setFormError('End time must be after the start time.')
+    const err = validate(
+      required(title, 'Title'),
+      maxLength(title, 100, 'Title'),
+      form.productId ? null : 'Please select a product.',
+      isPositive(startPrice, 'Starting price'),
+      isPositive(minIncrement, 'Min increment'),
+      Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) ? 'Choose valid start and end times.' : null,
+      dateAfter(form.endsAt, form.startsAt, 'End time', 'start time'),
+      dateInFuture(form.endsAt, 'End time'),
+    )
+    if (err) return setFormError(err)
 
     setSaving(true)
     setFormError(null)
@@ -191,13 +200,19 @@ export function BidControlPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this bid?')) return
+    const ok = await confirmDialog({
+      title: 'Delete this bid?',
+      message: 'The bid and all its entries will be permanently removed.',
+      confirmText: 'Delete',
+      variant: 'danger',
+    })
+    if (!ok) return
     setDeleting(id)
     try {
       await api.delete(`/bids/${id}`)
       fetchBids()
     } catch (err: any) {
-      alert(err.response?.data?.message ?? 'Delete failed')
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Delete failed' })
     } finally {
       setDeleting(null)
     }
@@ -326,9 +341,10 @@ export function BidControlPage() {
 
       {/* ── Create / Edit Bid Modal ── */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowForm(false)}>
           <form
             onSubmit={handleSubmit}
+            onClick={(e) => e.stopPropagation()}
             className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900"
           >
             <div className="mb-4 flex items-center justify-between">
@@ -420,8 +436,8 @@ function BidDetail({ bid, loading, onClose }: { bid: Bid; loading: boolean; onCl
   const initialCost   = bid.startPrice
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between bg-gradient-to-r from-brand-600 to-brand-500 px-5 py-4">
           <div>
@@ -565,8 +581,8 @@ function ProductPicker({ onPick, onClose }: { onPick: (p: Product) => void; onCl
   }, [])
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-slate-800">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Select Product</h2>

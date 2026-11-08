@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Bell, Loader2, Megaphone, RefreshCw, Send, Users } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { maxLength, required, validate } from '@/lib/validate'
 import api from '@/lib/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ export function NotificationsPage() {
   const [targetRole, setTargetRole] = useState<'ALL' | 'CUSTOMER' | 'PARTNER' | 'ADMIN'>('ALL')
   const [sending, setSending]       = useState(false)
   const [sendResult, setSendResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [sendError, setSendError]   = useState<string | null>(null)
 
   const fetchNotifications = async () => {
     setLoadingList(true)
@@ -65,7 +67,14 @@ export function NotificationsPage() {
   useEffect(() => { fetchNotifications() }, [])
 
   async function handleSend() {
-    if (!title.trim() || !body.trim()) return
+    setSendError(null)
+    const err = validate(
+      required(title, 'Title'),
+      maxLength(title, 100, 'Title'),
+      required(body, 'Message'),
+      maxLength(body, 500, 'Message'),
+    )
+    if (err) { setSendError(err); return }
     setSending(true)
     setSendResult(null)
     try {
@@ -125,12 +134,18 @@ export function NotificationsPage() {
         <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">Send Announcement</h2>
         <div className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Title</label>
-            <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Announcement title…" />
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Title</label>
+              <span className={`text-xs ${title.length > 100 ? 'text-red-500' : 'text-slate-400'}`}>{title.length}/100</span>
+            </div>
+            <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Announcement title…" maxLength={120} />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Message</label>
-            <textarea className={inputClass} rows={3} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Announcement body…" />
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Message</label>
+              <span className={`text-xs ${body.length > 500 ? 'text-red-500' : 'text-slate-400'}`}>{body.length}/500</span>
+            </div>
+            <textarea className={inputClass} rows={3} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Announcement body…" maxLength={520} />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Target audience</label>
@@ -148,6 +163,9 @@ export function NotificationsPage() {
             </div>
           </div>
 
+          {sendError && (
+            <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-400">{sendError}</p>
+          )}
           {sendResult && (
             <p className={`rounded-xl px-3 py-2 text-sm ${sendResult.ok ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'}`}>
               {sendResult.msg}

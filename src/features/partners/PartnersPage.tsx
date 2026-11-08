@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useAlert } from '@/components/ui/ConfirmDialog'
 import api from '@/lib/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -56,6 +57,7 @@ function formatDate(iso: string) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function PartnersPage() {
+  const alert = useAlert()
   const [partners, setPartners]     = useState<Partner[]>([])
   const [total, setTotal]           = useState(0)
   const [page, setPage]             = useState(1)
@@ -117,7 +119,7 @@ export function PartnersPage() {
       fetchPartners()
       if (selected?.id === partner.id) setSelected(null)
     } catch (err: any) {
-      alert(err.response?.data?.message ?? 'Action failed')
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Action failed' })
     } finally {
       setStatusUpdatingId(null)
     }

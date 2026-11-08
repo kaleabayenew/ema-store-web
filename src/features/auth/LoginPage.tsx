@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { isEmail, minLength, required, validate } from '@/lib/validate'
 import { loginWithUsername } from '@/services/authService'
 import { useAuthStore } from '@/store/authStore'
 import type { Role } from '@/types/auth'
@@ -27,8 +28,17 @@ export function LoginPage() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    setIsSubmitting(true)
     setError('')
+
+    const err = validate(
+      required(email, 'Email'),
+      isEmail(email),
+      required(password, 'Password'),
+      minLength(password, 6, 'Password'),
+    )
+    if (err) { setError(err); return }
+
+    setIsSubmitting(true)
 
     try {
       const session = await loginWithUsername({ username: email, password, role })

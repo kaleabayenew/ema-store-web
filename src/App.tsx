@@ -3,12 +3,16 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { SessionExpiredDialog } from './components/auth/SessionExpiredDialog'
 import { AppLayout } from './components/layout/AppLayout'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
+import { ConfirmProvider } from './components/ui/ConfirmDialog'
+import { TopProgressBar } from './components/ui/TopProgressBar'
+import { AboutPage } from './features/about/AboutPage'
 import { ApprovalsPage } from './features/approvals/ApprovalsPage'
 import { ForbiddenPage } from './features/auth/ForbiddenPage'
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage'
 import { LoginPage } from './features/auth/LoginPage'
 import { OtpPage } from './features/auth/OtpPage'
 import { BidControlPage } from './features/bids/BidControlPage'
+import { PaymentBannersPage } from './features/banners/PaymentBannersPage'
 import { CustomersPage } from './features/customers/CustomersPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { DeliveryPage } from './features/delivery/DeliveryPage'
@@ -34,7 +38,9 @@ function App() {
 
   return (
     <ErrorBoundary>
+      <ConfirmProvider>
       <BrowserRouter>
+      <TopProgressBar />
       <SessionExpiredDialog />
       <Routes>
         {/* Public */}
@@ -65,6 +71,8 @@ function App() {
             <Route path="/delivery"  element={<DeliveryPage />} />
             <Route path="/finance"   element={<FinancePage />} />
             <Route path="/approvals" element={<ApprovalsPage />} />
+            <Route path="/banners"   element={<PaymentBannersPage />} />
+            <Route path="/about"     element={<AboutPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
 
             {/* Admin */}
@@ -82,6 +90,7 @@ function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+      </ConfirmProvider>
     </ErrorBoundary>
   )
 }

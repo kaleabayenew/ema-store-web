@@ -1,0 +1,107 @@
+<svg width="1200" height="750" viewBox="0 0 1200 750" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b132b"/>
+      <stop offset="100%" stop-color="#1c2541"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="750" fill="url(#bg2)"/>
+
+  <!-- Top bar -->
+  <rect x="0" y="0" width="1200" height="64" fill="#0b132b" stroke="#334155" stroke-width="1"/>
+  <circle cx="36" cy="32" r="14" fill="#3b82f6"/>
+  <text x="62" y="38" fill="#ffffff" font-size="16" font-weight="800">EMA STORE</text>
+  <rect x="175" y="20" width="1" height="24" fill="#334155"/>
+  <text x="195" y="38" fill="#60a5fa" font-size="14" font-weight="600">Layout 2: Kanban Pipeline View (Drag &amp; Drop Status)</text>
+
+  <!-- Filter & Actions Bar -->
+  <g transform="translate(40, 80)">
+    <rect width="1120" height="50" rx="10" fill="#1c2541" stroke="#334155"/>
+    <text x="20" y="31" fill="#94a3b8" font-size="13">Filter: All Priorities</text>
+    <rect x="160" y="10" width="180" height="30" rx="6" fill="#0b132b" stroke="#334155"/>
+    <text x="175" y="30" fill="#64748b" font-size="11">🔍 Quick filter tickets...</text>
+    <rect x="980" y="10" width="120" height="30" rx="6" fill="#2563eb"/>
+    <text x="1002" y="30" fill="#ffffff" font-size="12" font-weight="600">+ New Ticket</text>
+  </g>
+
+  <!-- 4 KANBAN LANES -->
+  <!-- Lane 1: OPEN (New) -->
+  <g transform="translate(40, 150)">
+    <rect width="260" height="570" rx="12" fill="#1c2541" stroke="#334155"/>
+    <rect x="12" y="12" width="10" height="10" rx="5" fill="#ef4444"/>
+    <text x="30" y="22" fill="#ffffff" font-size="13" font-weight="700">OPEN TICKETS</text>
+    <rect x="215" y="8" width="32" height="20" rx="10" fill="#334155"/>
+    <text x="227" y="22" fill="#f87171" font-size="11" font-weight="700">5</text>
+
+    <!-- Card A -->
+    <g transform="translate(12, 45)">
+      <rect width="236" height="120" rx="8" fill="#0b132b" stroke="#ef4444" stroke-width="1.5"/>
+      <text x="10" y="22" fill="#f87171" font-size="10" font-weight="700">URGENT · 2m ago</text>
+      <text x="10" y="42" fill="#ffffff" font-size="12" font-weight="700">Double charged on Telebirr</text>
+      <text x="10" y="60" fill="#94a3b8" font-size="11">Kassahun B. (+251911...)</text>
+      <rect x="10" y="75" width="216" height="30" rx="4" fill="#1e293b"/>
+      <text x="60" y="95" fill="#38bdf8" font-size="11">💬 Open quick chat</text>
+    </g>
+
+    <!-- Card B -->
+    <g transform="translate(12, 180)">
+      <rect width="236" height="105" rx="8" fill="#0b132b" stroke="#334155"/>
+      <text x="10" y="22" fill="#fbbf24" font-size="10" font-weight="700">MEDIUM · 18m ago</text>
+      <text x="10" y="42" fill="#ffffff" font-size="12" font-weight="700">Address change request</text>
+      <text x="10" y="60" fill="#94a3b8" font-size="11">Hanan M. (+251922...)</text>
+    </g>
+  </g>
+
+  <!-- Lane 2: IN PROGRESS -->
+  <g transform="translate(325, 150)">
+    <rect width="260" height="570" rx="12" fill="#1c2541" stroke="#334155"/>
+    <rect x="12" y="12" width="10" height="10" rx="5" fill="#3b82f6"/>
+    <text x="30" y="22" fill="#ffffff" font-size="13" font-weight="700">IN PROGRESS</text>
+    <rect x="215" y="8" width="32" height="20" rx="10" fill="#334155"/>
+    <text x="227" y="22" fill="#60a5fa" font-size="11" font-weight="700">8</text>
+
+    <!-- Card C -->
+    <g transform="translate(12, 45)">
+      <rect width="236" height="130" rx="8" fill="#0b132b" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="10" y="22" fill="#60a5fa" font-size="10" font-weight="700">ASSIGNED TO: KALEAB</text>
+      <text x="10" y="42" fill="#ffffff" font-size="12" font-weight="700">Shoe size replacement</text>
+      <text x="10" y="60" fill="#94a3b8" font-size="11">Bethlehem T. (+251933...)</text>
+      <text x="10" y="78" fill="#64748b" font-size="10">Last reply: 4m ago by Staff</text>
+      <rect x="10" y="90" width="216" height="28" rx="4" fill="#2563eb"/>
+      <text x="75" y="108" fill="#ffffff" font-size="11" font-weight="600">View Thread</text>
+    </g>
+  </g>
+
+  <!-- Lane 3: AWAITING USER -->
+  <g transform="translate(610, 150)">
+    <rect width="260" height="570" rx="12" fill="#1c2541" stroke="#334155"/>
+    <rect x="12" y="12" width="10" height="10" rx="5" fill="#f59e0b"/>
+    <text x="30" y="22" fill="#ffffff" font-size="13" font-weight="700">AWAITING USER</text>
+    <rect x="215" y="8" width="32" height="20" rx="10" fill="#334155"/>
+    <text x="227" y="22" fill="#fbbf24" font-size="11" font-weight="700">4</text>
+
+    <g transform="translate(12, 45)">
+      <rect width="236" height="110" rx="8" fill="#0b132b" stroke="#334155"/>
+      <text x="10" y="22" fill="#fbbf24" font-size="10" font-weight="700">SENT PHOTO UPLOAD LINK</text>
+      <text x="10" y="42" fill="#ffffff" font-size="12" font-weight="700">Damaged package photo</text>
+      <text x="10" y="60" fill="#94a3b8" font-size="11">Natnael G. (+251944...)</text>
+    </g>
+  </g>
+
+  <!-- Lane 4: RESOLVED -->
+  <g transform="translate(895, 150)">
+    <rect width="260" height="570" rx="12" fill="#1c2541" stroke="#334155"/>
+    <rect x="12" y="12" width="10" height="10" rx="5" fill="#10b981"/>
+    <text x="30" y="22" fill="#ffffff" font-size="13" font-weight="700">RESOLVED TODAY</text>
+    <rect x="215" y="8" width="32" height="20" rx="10" fill="#334155"/>
+    <text x="223" y="22" fill="#34d399" font-size="11" font-weight="700">24</text>
+
+    <g transform="translate(12, 45)">
+      <rect width="236" height="90" rx="8" fill="#0b132b" stroke="#10b981" stroke-width="1"/>
+      <text x="10" y="22" fill="#34d399" font-size="10" font-weight="700">RESOLVED ✓</text>
+      <text x="10" y="42" fill="#ffffff" font-size="12" font-weight="700">Refund issued #REF-3312</text>
+      <text x="10" y="60" fill="#94a3b8" font-size="11">Yared K. (+251955...)</text>
+    </g>
+  </g>
+</svg>

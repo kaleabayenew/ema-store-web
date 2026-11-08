@@ -13,6 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useAlert } from '@/components/ui/ConfirmDialog'
 import api from '@/lib/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -83,6 +84,7 @@ function shortId(id: string) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function OrdersPage() {
+  const alert = useAlert()
   const [orders, setOrders] = useState<Order[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -162,7 +164,7 @@ export function OrdersPage() {
       fetchOrders()
       if (detail?.id === orderId) setDetail((d) => d ? { ...d, status } : null)
     } catch (err: any) {
-      alert(err.response?.data?.message ?? 'Failed to update status')
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to update status' })
     } finally {
       setUpdatingStatus(false)
     }
@@ -341,8 +343,8 @@ export function OrdersPage() {
 
       {/* ── Order Detail Modal ── */}
       {detail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setDetail(null)}>
+          <div className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between bg-gradient-to-r from-brand-600 to-brand-500 px-5 py-4">
               <div>

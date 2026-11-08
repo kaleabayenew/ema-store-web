@@ -18,6 +18,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   '/reports':            ['SUPER_ADMIN', 'PARTNER_MANAGER', 'PRODUCT_MANAGER', 'FINANCE'],
   '/delivery':           ['SUPER_ADMIN'],
   '/approvals':          ['SUPER_ADMIN', 'PARTNER_MANAGER', 'PRODUCT_MANAGER'],
+  '/banners':            ['SUPER_ADMIN', 'MANAGEMENT', 'MARKETING'],
   '/notifications':      ['SUPER_ADMIN', 'MANAGEMENT', 'MARKETING'],
   '/users':              ['SUPER_ADMIN'],
   '/settings':           ['SUPER_ADMIN'],
@@ -30,12 +31,12 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
 // ─────────────────────────────────────────────────────────────────────────────
 export const ROLE_PERMISSIONS: Record<Role, string[]> = {
   SUPER_ADMIN:      ['*'],
-  MANAGEMENT:       ['dashboard', 'customers', 'partners', 'products', 'orders', 'ride', 'marketing', 'flash-deals', 'notifications'],
+  MANAGEMENT:       ['dashboard', 'customers', 'partners', 'products', 'orders', 'ride', 'marketing', 'flash-deals', 'banners', 'notifications'],
   CUSTOMER_SUPPORT: ['dashboard', 'customers', 'support'],
   PARTNER_MANAGER:  ['dashboard', 'partners', 'reports', 'approvals'],
   PRODUCT_MANAGER:  ['dashboard', 'products', 'orders', 'reports', 'approvals'],
   FINANCE:          ['dashboard', 'orders', 'finance', 'reports'],
-  MARKETING:        ['dashboard', 'marketing', 'flash-deals', 'notifications'],
+  MARKETING:        ['dashboard', 'marketing', 'flash-deals', 'banners', 'notifications'],
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

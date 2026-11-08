@@ -3,6 +3,8 @@ import { Flame, Clock, Tag, Plus, Trash2 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { dateAfter, dateInFuture, inRange, isInteger, isUrl, maxLength, required, validate } from '@/lib/validate'
 import { api } from '@/lib/api'
 
 interface FlashDeal {
@@ -45,6 +47,7 @@ const inputClass =
   'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100'
 
 export function FlashDealsPage() {
+  const confirmDialog = useConfirm()
   const [deals, setDeals] = useState<FlashDeal[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -107,13 +110,18 @@ export function FlashDealsPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this flash deal?')) {
-      try {
-        await api.delete(`/flash-deals/${id}`)
-        setDeals(deals.filter((d) => d.id !== id))
-      } catch (error) {
-        console.error('Failed to delete flash deal:', error)
-      }
+    const ok = await confirmDialog({
+      title: 'Delete this flash deal?',
+      message: 'This flash deal will be removed permanently.',
+      confirmText: 'Delete',
+      variant: 'danger',
+    })
+    if (!ok) return
+    try {
+      await api.delete(`/flash-deals/${id}`)
+      setDeals(deals.filter((d) => d.id !== id))
+    } catch (error) {
+      console.error('Failed to delete flash deal:', error)
     }
   }
 
@@ -159,15 +167,20 @@ export function FlashDealsPage() {
     const start = new Date(form.starts_at)
     const end = new Date(form.ends_at)
 
-    if (!title) return setFormError('Title is required.')
-    if (!Number.isInteger(discount) || discount < 1 || discount > 99) {
-      return setFormError('Discount must be a whole number from 1 to 99.')
-    }
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      return setFormError('Please choose a start and end time.')
-    }
-    if (end <= start) return setFormError('End time must be after the start time.')
-    if (end <= new Date()) return setFormError('End time must be in the future.')
+    const err = validate(
+      required(title, 'Title'),
+      maxLength(title, 100, 'Title'),
+      maxLength(form.description.trim(), 500, 'Description'),
+      required(form.discount_percent, 'Discount'),
+      isInteger(form.discount_percent, 'Discount'),
+      inRange(form.discount_percent, 1, 99, 'Discount'),
+      required(form.starts_at, 'Start time'),
+      required(form.ends_at, 'End time'),
+      dateAfter(form.ends_at, form.starts_at, 'End time', 'start time'),
+      dateInFuture(form.ends_at, 'End time'),
+      form.image_url.trim() ? isUrl(form.image_url, true) : null,
+    )
+    if (err) return setFormError(err)
 
     try {
       setSubmitting(true)
@@ -333,9 +346,10 @@ export function FlashDealsPage() {
 
       {/* Create Deal Dialog */}
       {showCreateDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowCreateDialog(false)}>
           <form
             onSubmit={handleCreate}
+            onClick={(e) => e.stopPropagation()}
             className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900"
           >
             <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">

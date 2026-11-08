@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useAlert, useConfirm, usePrompt } from '@/components/ui/ConfirmDialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +39,8 @@ interface Customer {
   fullName: string
   phone: string
   isActive: boolean
+  isBlocked?: boolean
+  blockReason?: string | null
   balance: number
   coins: number
   totalOrders: number
@@ -103,6 +106,9 @@ function orderStatusStyle(status: string) {
 type FilterStatus = 'all' | 'active' | 'blocked'
 
 export function CustomersPage() {
+  const alert = useAlert()
+  const confirmDialog = useConfirm()
+  const promptDialog = usePrompt()
   const [search, setSearch]   = useState('')
   const [filter, setFilter]   = useState<FilterStatus>('all')
   const [page, setPage]       = useState(1)
@@ -194,7 +200,7 @@ export function CustomersPage() {
       // Refresh the list so any derived state stays fresh
       fetchCustomers()
     } catch (err: any) {
-      alert(err.response?.data?.message ?? 'Failed to reset password')
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to reset password' })
     } finally {
       setResetting(false)
     }
@@ -224,12 +230,59 @@ export function CustomersPage() {
   useEffect(() => { setPage(1) }, [search, filter])
 
   async function toggleBlock(customer: Customer) {
+    const isCurrentlyActive = customer.isActive && !customer.isBlocked
+    let reason: string | null = null
+
+    if (isCurrentlyActive) {
+      const ok = await confirmDialog({
+        title: `Suspend ${customer.fullName}?`,
+        message: 'This will block the customer from accessing the app. You can add a reason next.',
+        confirmText: 'Continue',
+        variant: 'danger',
+      })
+      if (!ok) return
+      const input = await promptDialog({
+        title: `Suspend ${customer.fullName}`,
+        message: 'Enter a suspension reason (leave blank for the default message).',
+        defaultValue: 'Your account has been suspended by the administration. Please contact support.',
+        multiline: true,
+        maxLength: 500,
+        confirmText: 'Suspend',
+      })
+      if (input === null) return // Admin cancelled
+      reason = input.trim() || null
+    } else {
+      const ok = await confirmDialog({
+        title: `Unblock ${customer.fullName}?`,
+        message: 'This will restore the customer\'s access to the app.',
+        confirmText: 'Unblock',
+      })
+      if (!ok) return
+    }
+
     setBlockingId(customer.id)
     try {
-      await api.patch(`/customers/${customer.id}/block`, { block: customer.isActive })
-      fetchCustomers()
+      await api.patch(`/customers/${customer.id}/block`, {
+        block: isCurrentlyActive,
+        reason,
+      })
+      await fetchCustomers()
+      if (selected?.id === customer.id) {
+        setSelected((prev) =>
+          prev
+            ? {
+                ...prev,
+                isActive: !isCurrentlyActive,
+                isBlocked: isCurrentlyActive,
+                blockReason: isCurrentlyActive
+                  ? (reason ?? 'Your account has been suspended by the administration. Please contact support.')
+                  : null,
+              }
+            : null,
+        )
+      }
     } catch (err: any) {
-      alert(err.response?.data?.message ?? 'Action failed')
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Action failed' })
     } finally {
       setBlockingId(null)
     }
@@ -239,8 +292,8 @@ export function CustomersPage() {
   const customers  = data?.customers ?? []
   const total      = data?.total ?? 0
   const totalPages = data?.totalPages ?? 1
-  const active     = customers.filter((c) => c.isActive).length
-  const blocked    = customers.filter((c) => !c.isActive).length
+  const active     = customers.filter((c) => c.isActive && !c.isBlocked).length
+  const blocked    = customers.filter((c) => !c.isActive || c.isBlocked).length
   const totalSpent = customers.reduce((s, c) => s + c.totalSpent, 0)
 
   return (
@@ -390,8 +443,8 @@ export function CustomersPage() {
 
                     {/* Status */}
                     <td className="px-4 py-3">
-                      <Badge variant={c.isActive ? 'success' : 'destructive'}>
-                        {c.isActive ? 'Active' : 'Blocked'}
+                      <Badge variant={!c.isBlocked && c.isActive ? 'success' : 'destructive'}>
+                        {!c.isBlocked && c.isActive ? 'Active' : 'Blocked'}
                       </Badge>
                     </td>
 
@@ -431,14 +484,14 @@ export function CustomersPage() {
                           <DropdownMenuItem
                             disabled={blockingId === c.id}
                             onClick={() => toggleBlock(c)}
-                            className={c.isActive ? 'text-red-500 focus:text-red-600' : 'text-emerald-600 focus:text-emerald-700'}
+                            className={!c.isBlocked && c.isActive ? 'text-red-500 focus:text-red-600' : 'text-emerald-600 focus:text-emerald-700'}
                           >
                             {blockingId === c.id
                               ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              : c.isActive
+                              : (!c.isBlocked && c.isActive)
                                 ? <Ban className="mr-2 h-4 w-4" />
                                 : <CheckCircle className="mr-2 h-4 w-4" />}
-                            {c.isActive ? 'Block customer' : 'Unblock customer'}
+                            {(!c.isBlocked && c.isActive) ? 'Block customer' : 'Unblock customer'}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -503,8 +556,8 @@ export function CustomersPage() {
                     <span className="flex items-center gap-1 text-xs text-brand-100">
                       <Phone className="h-3 w-3" />{selected.phone}
                     </span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${selected.isActive ? 'bg-emerald-400/30 text-emerald-100' : 'bg-red-400/30 text-red-100'}`}>
-                      {selected.isActive ? '● Active' : '● Blocked'}
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${!selected.isBlocked && selected.isActive ? 'bg-emerald-400/30 text-emerald-100' : 'bg-red-400/30 text-red-100'}`}>
+                      {!selected.isBlocked && selected.isActive ? '● Active' : '● Blocked'}
                     </span>
                   </div>
                 </div>
@@ -539,7 +592,7 @@ export function CustomersPage() {
                 { label: 'Customer ID',    value: selected.id.slice(0, 16) + '…', mono: true },
                 { label: 'Joined',         value: formatDate(selected.joinedAt) },
                 { label: 'Wallet Balance', value: formatCurrency(selected.balance), highlight: true },
-                { label: 'Status',         value: selected.isActive ? 'Active' : 'Blocked' },
+                { label: 'Status',         value: !selected.isBlocked && selected.isActive ? 'Active' : 'Blocked' },
               ].map(({ label, value, mono, highlight }) => (
                 <div key={label} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
                   <p className="text-xs text-slate-400">{label}</p>
@@ -548,6 +601,14 @@ export function CustomersPage() {
                   </p>
                 </div>
               ))}
+
+              {/* Suspension Reason (if blocked) */}
+              {(selected.isBlocked || !selected.isActive) && selected.blockReason && (
+                <div className="col-span-2 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/30">
+                  <p className="text-xs font-semibold text-red-600 dark:text-red-400">Suspension Reason</p>
+                  <p className="mt-1 text-xs text-red-700 dark:text-red-300">{selected.blockReason}</p>
+                </div>
+              )}
 
               {/* Password row (spans full width) — PIN-gated reveal */}
               <div className="col-span-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
@@ -618,16 +679,16 @@ export function CustomersPage() {
                 Copy Phone
               </Button>
               <Button
-                className={`flex-1 text-white ${selected.isActive ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                className={`flex-1 text-white ${!selected.isBlocked && selected.isActive ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}
                 disabled={blockingId === selected.id}
-                onClick={() => { toggleBlock(selected); setSelected(null); }}
+                onClick={() => { toggleBlock(selected); }}
               >
                 {blockingId === selected.id ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : selected.isActive ? (
-                  <><Ban className="mr-2 h-4 w-4" />Block</>
+                ) : (!selected.isBlocked && selected.isActive) ? (
+                  <><Ban className="mr-2 h-4 w-4" />Block Customer</>
                 ) : (
-                  <><CheckCircle className="mr-2 h-4 w-4" />Unblock</>
+                  <><CheckCircle className="mr-2 h-4 w-4" />Unblock Customer</>
                 )}
               </Button>
             </div>

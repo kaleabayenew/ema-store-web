@@ -1,6 +1,6 @@
 import {
   BarChart3, Bell, Bike, Boxes, Building2, CreditCard, FileText, Flame, Gavel,
-  LayoutDashboard, LogOut, MessageSquareText, PackageCheck,
+  Image, Info, LayoutDashboard, LogOut, MessageSquareText, PackageCheck,
   Settings, ShoppingCart, Sparkles, UserRoundCog, Users, Warehouse,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -36,6 +36,8 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { title: 'Delivery',   href: '/delivery',  icon: Warehouse },
       { title: 'Finance',    href: '/finance',   icon: CreditCard },
       { title: 'Approvals',  href: '/approvals', icon: PackageCheck },
+      { title: 'Banners',    href: '/banners',   icon: Image },
+      { title: 'About',      href: '/about',     icon: Info },
     ],
   },
   {

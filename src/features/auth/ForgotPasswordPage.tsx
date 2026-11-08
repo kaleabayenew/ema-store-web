@@ -2,15 +2,20 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { isEmail, required, validate } from '@/lib/validate'
 import { requestPasswordReset } from '@/services/authService'
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('admin@emastore.et')
   const [message, setMessage] = useState('')
+  const [error, setError]     = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
+    setError('')
+    const err = validate(required(email, 'Email'), isEmail(email))
+    if (err) { setError(err); return }
     setIsSubmitting(true)
 
     try {
@@ -44,6 +49,7 @@ export function ForgotPasswordPage() {
           </div>
 
           {message && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">{message}</div>}
+          {error   && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">{error}</div>}
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? 'Sending...' : 'Send reset link'}

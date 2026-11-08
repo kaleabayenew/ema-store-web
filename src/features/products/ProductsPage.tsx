@@ -3,6 +3,7 @@ import { Boxes, Package, Star, Search, Pencil, Trash2, Loader2, AlertCircle, Che
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useAlert } from '@/components/ui/ConfirmDialog'
 import { ProductForm } from './ProductForm'
 import api from '@/lib/api'
 
@@ -49,6 +50,7 @@ const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'default'
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function ProductsPage() {
+  const alert = useAlert()
   const [products, setProducts]     = useState<Product[]>([])
   const [total, setTotal]           = useState(0)
   const [page, setPage]             = useState(1)
@@ -137,7 +139,7 @@ export function ProductsPage() {
           })
           imageUrl = uploadResponse.data.url
         } catch {
-          alert('Failed to upload image. Try a URL instead.')
+          alert({ variant: 'error', message: 'Failed to upload image. Try a URL instead.' })
           return
         }
       }
@@ -151,7 +153,7 @@ export function ProductsPage() {
       setShowAddDialog(false)
       fetchProducts()
     } catch (err: any) {
-      alert(err.response?.data?.message ?? 'Failed to create product')
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to create product' })
     }
   }
 
@@ -169,7 +171,7 @@ export function ProductsPage() {
           })
           imageUrl = uploadResponse.data.url
         } catch {
-          alert('Failed to upload image. Try a URL instead.')
+          alert({ variant: 'error', message: 'Failed to upload image. Try a URL instead.' })
           return
         }
       }
@@ -184,7 +186,7 @@ export function ProductsPage() {
       setSelectedProduct(null)
       fetchProducts()
     } catch (err: any) {
-      alert(err.response?.data?.message ?? 'Failed to update product')
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to update product' })
     }
   }
 
@@ -197,7 +199,7 @@ export function ProductsPage() {
       setSelectedProduct(null)
       fetchProducts()
     } catch (err: any) {
-      alert(err.response?.data?.message ?? 'Failed to delete product')
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to delete product' })
     } finally {
       setDeleting(false)
     }
@@ -448,8 +450,8 @@ export function ProductsPage() {
 
       {/* Add Product Dialog */}
       {showAddDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowAddDialog(false)}>
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Add New Product</h2>
             <ProductForm
               categories={categories}
@@ -462,8 +464,8 @@ export function ProductsPage() {
 
       {/* Edit Product Dialog */}
       {showEditDialog && selectedProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => { setShowEditDialog(false); setSelectedProduct(null) }}>
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Edit Product</h2>
             <ProductForm
               initialData={{
@@ -493,8 +495,8 @@ export function ProductsPage() {
 
       {/* Delete Confirmation Dialog */}
       {showDeleteDialog && selectedProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => { setShowDeleteDialog(false); setSelectedProduct(null) }}>
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">Delete Product</h2>
             <p className="text-slate-600 dark:text-slate-300 mb-6">
               Are you sure you want to delete <strong>{selectedProduct.nameEn}</strong>? This action cannot be undone.

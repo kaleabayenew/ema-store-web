@@ -3,6 +3,7 @@ import { Sparkles, Tag, Eye, MousePointerClick, Plus } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { WheelSettingsPage } from './WheelSettingsPage'
 
 const stats = [
   { label: 'Active campaigns', value: '12',   delta: '+3',     tone: 'success', icon: Sparkles },
@@ -31,7 +32,7 @@ const campaignVariant: Record<string, 'success' | 'warning' | 'default' | 'info'
 }
 
 export function MarketingPage() {
-  const [tab, setTab] = useState<'campaigns' | 'coupons'>('campaigns')
+  const [tab, setTab] = useState<'campaigns' | 'coupons' | 'wheel'>('campaigns')
 
   return (
     <div className="space-y-6">
@@ -58,10 +59,10 @@ export function MarketingPage() {
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex gap-1 border-b border-slate-200 px-4 pt-3 dark:border-slate-800">
-          {(['campaigns', 'coupons'] as const).map((t) => (
+          {(['campaigns', 'coupons', 'wheel'] as const).map((t) => (
             <button key={t} type="button" onClick={() => setTab(t)}
               className={`rounded-t-lg px-4 py-2 text-sm font-medium capitalize transition ${tab === t ? 'border-b-2 border-brand-600 text-brand-700 dark:text-brand-300' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'}`}>
-              {t}
+              {t === 'wheel' ? 'Spin Wheel' : t}
             </button>
           ))}
         </div>
@@ -129,6 +130,8 @@ export function MarketingPage() {
             </table>
           </div>
         )}
+
+        {tab === 'wheel' && <WheelSettingsPage />}
       </div>
     </div>
   )
