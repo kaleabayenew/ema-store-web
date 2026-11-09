@@ -6,7 +6,7 @@ const baseURL = import.meta.env.VITE_API_URL ?? 'https://ema-store-backend.onren
 
 export const api = axios.create({
   baseURL,
-  timeout: 15000,
+  timeout: 30000,
 })
 
 api.interceptors.request.use((config) => {
