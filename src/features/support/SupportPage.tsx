@@ -27,6 +27,8 @@ interface Ticket {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
   customerName: string
   customerPhone: string
+  guestId?: string | null
+  isGuest?: boolean
   messageCount: number
   unreadCount: number
   createdAt: string
@@ -592,15 +594,15 @@ export function SupportPage() {
 
   // ── Fetch helpers ────────────────────────────────────────────────────────────
 
-  const fetchTickets = useCallback(async () => {
-    setLoading(true); setError(null)
+  const fetchTickets = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setError(null) }
     try {
       const res = await api.get('/support', { params: { search, status: filter === 'All' ? undefined : filter, limit: 50 } })
       setTickets(res.data.tickets ?? [])
       setStats({ total: res.data.total ?? 0, open: res.data.open ?? 0, inProgress: res.data.inProgress ?? 0, resolved: res.data.resolved ?? 0 })
     } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Failed to load tickets')
-    } finally { setLoading(false) }
+      if (!silent) setError(err.response?.data?.message ?? 'Failed to load tickets')
+    } finally { if (!silent) setLoading(false) }
   }, [search, filter])
 
   useEffect(() => { fetchTickets() }, [fetchTickets])
@@ -614,7 +616,7 @@ export function SupportPage() {
   // Poll for new tickets/messages every 5 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchTickets()
+      fetchTickets(true)
     }, 5000)
     return () => clearInterval(interval)
   }, [fetchTickets])
@@ -629,7 +631,7 @@ export function SupportPage() {
 
   // Debounced search
   useEffect(() => {
-    const t = setTimeout(fetchTickets, search ? 400 : 0)
+    const t = setTimeout(() => fetchTickets(), search ? 400 : 0)
     return () => clearTimeout(t)
     // eslint-disable-next-line
   }, [search])
@@ -700,7 +702,7 @@ export function SupportPage() {
       const res = await api.get<{ ticket: TicketDetail }>(`/support/${ticket.id}`)
       setSelected(res.data.ticket)
       // Mark customer messages as read (admin has seen them)
-      api.post(`/support/${ticket.id}/read`, { byStaff: true }).catch(() => {})
+      api.post(`/support/${ticket.id}/read`, {}).catch(() => {})
       startTypingPoll(ticket.id)
     } catch { } finally { setDetailLoading(false) }
   }
@@ -714,7 +716,7 @@ export function SupportPage() {
     try {
       const res = await api.get<{ ticket: TicketDetail }>(`/support/${id}`)
       setSelected(res.data.ticket)
-      api.post(`/support/${id}/read`, { byStaff: true }).catch(() => {})
+      api.post(`/support/${id}/read`, {}).catch(() => {})
       startTypingPoll(id)
     } catch { } finally { setDetailLoading(false) }
   }
@@ -736,8 +738,15 @@ export function SupportPage() {
 
         // Fetch new messages to update the conversation
         const res = await api.get<{ ticket: TicketDetail }>(`/support/${ticketId}`)
-        console.log('🔄 Polling ticket:', ticketId, 'Messages:', res.data.ticket.messages.length)
-        setSelected(res.data.ticket)
+        setSelected((prev) => {
+          if (!prev || prev.id !== ticketId) return prev
+          const next = res.data.ticket
+          const same = prev.status === next.status && prev.messages.length === next.messages.length &&
+            prev.messages[prev.messages.length - 1]?.id === next.messages[next.messages.length - 1]?.id
+          return same ? prev : next
+        })
+        // keep customer messages marked read while the admin has the ticket open
+        api.post(`/support/${ticketId}/read`).catch(() => {})
       } catch (err) {
         console.error('Polling error:', err)
       }
@@ -762,8 +771,8 @@ export function SupportPage() {
       const res = await api.get<{ ticket: TicketDetail }>(`/support/${selected.id}`)
       setSelected(res.data.ticket)
       // Admin just replied → they've seen the customer's messages
-      api.post(`/support/${selected.id}/read`, { byStaff: true }).catch(() => {})
-      fetchTickets()
+      api.post(`/support/${selected.id}/read`, {}).catch(() => {})
+      fetchTickets(true)
     } catch (err: any) {
       alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to send reply' })
     } finally { setSending(false) }
@@ -775,7 +784,7 @@ export function SupportPage() {
     try {
       await api.patch(`/support/${selected.id}/status`, { status })
       setSelected((s) => s ? { ...s, status: status as Ticket['status'] } : null)
-      fetchTickets()
+      fetchTickets(true)
     } catch (err: any) {
       alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to update status' })
     } finally { setChangingStatus(false) }
@@ -829,7 +838,7 @@ export function SupportPage() {
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Support tickets</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchTickets} disabled={loading}>
+          <Button variant="outline" onClick={() => fetchTickets()} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
           </Button>
           <Button variant="outline" onClick={() => { setShowSettings(true); setSettingsTab('chat') }}>
@@ -938,6 +947,7 @@ export function SupportPage() {
                       <p className="truncate font-medium text-slate-900 dark:text-slate-100">{t.subject}</p>
                       <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
                         <span className="text-xs text-slate-500">{t.customerName}</span>
+                        {t.isGuest && <Badge variant="default">Guest</Badge>}
                         {t.customerPhone && (
                           <>
                             <span className="text-xs text-slate-300 dark:text-slate-600">·</span>
