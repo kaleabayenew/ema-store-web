@@ -736,8 +736,11 @@ export function SupportPage() {
 
         // Fetch new messages to update the conversation
         const res = await api.get<{ ticket: TicketDetail }>(`/support/${ticketId}`)
+        console.log('🔄 Polling ticket:', ticketId, 'Messages:', res.data.ticket.messages.length)
         setSelected(res.data.ticket)
-      } catch { /* ignore */ }
+      } catch (err) {
+        console.error('Polling error:', err)
+      }
     }, 3000)
   }
 
