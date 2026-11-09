@@ -14,6 +14,9 @@ api.interceptors.request.use((config) => {
 
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`
+    console.log('[API Request]', config.method?.toUpperCase(), config.url, 'Token:', accessToken.substring(0, 20) + '...')
+  } else {
+    console.log('[API Request]', config.method?.toUpperCase(), config.url, 'No token')
   }
 
   return config
@@ -24,29 +27,10 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true
-
-      try {
-        const { refreshToken } = useAuthStore.getState()
-
-        if (!refreshToken) {
-          throw new Error('No refresh token available')
-        }
-
-        const { data } = await axios.post(`${baseURL}/auth/refresh-token`, { refreshToken })
-
-        useAuthStore.setState({
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
-        })
-
-        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`
-        return api(originalRequest)
-      } catch {
-        useAuthStore.getState().logout()
-        window.location.href = '/login'
-      }
+    if (error.response?.status === 401) {
+      // Backend doesn't support refresh tokens - just logout immediately
+      useAuthStore.getState().logout()
+      window.location.href = '/login'
     }
 
     return Promise.reject(error)

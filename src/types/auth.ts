@@ -1,5 +1,7 @@
 export type Role =
+  | 'ADMIN'
   | 'SUPER_ADMIN'
+  | 'MANAGER'
   | 'MANAGEMENT'
   | 'CUSTOMER_SUPPORT'
   | 'PARTNER_MANAGER'
