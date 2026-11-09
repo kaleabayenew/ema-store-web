@@ -27,8 +27,6 @@ interface Ticket {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
   customerName: string
   customerPhone: string
-  guestId?: string | null
-  isGuest?: boolean
   messageCount: number
   unreadCount: number
   createdAt: string
@@ -311,6 +309,9 @@ function ConversationHistoryTab({ onOpenTicket }: { onOpenTicket: (id: string) =
 
   const [staffList, setStaffList]   = useState<StaffUser[]>([])
 
+  const confirmDialog = useConfirm()
+  const alert = useAlert()
+
   useEffect(() => {
     api.get('/support/staff-users')
       .then((r) => setStaffList(r.data.staff ?? []))
@@ -340,6 +341,25 @@ function ConversationHistoryTab({ onOpenTicket }: { onOpenTicket: (id: string) =
   }, [search, statusFilter, staffId, dateFrom, dateTo])
 
   useEffect(() => { fetchHistory(1) }, [fetchHistory])
+
+  // Delete ticket from history
+  async function deleteHistoryTicket(ticketId: string) {
+    const confirmed = await confirmDialog({
+      title: 'Delete ticket',
+      message: 'Are you sure you want to delete this ticket? This action cannot be undone.',
+      confirmText: 'Delete',
+      confirmVariant: 'danger',
+    })
+    if (!confirmed) return
+
+    try {
+      await api.delete(`/support/${ticketId}`)
+      fetchHistory(page)
+      alert({ variant: 'success', message: 'Ticket deleted successfully' })
+    } catch (err: any) {
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to delete ticket' })
+    }
+  }
 
   const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'info' | 'default'> = {
     OPEN: 'warning', IN_PROGRESS: 'info', RESOLVED: 'success', CLOSED: 'default',
@@ -473,7 +493,7 @@ function ConversationHistoryTab({ onOpenTicket }: { onOpenTicket: (id: string) =
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left dark:border-slate-800">
-                  {['Subject', 'Customer', 'Status', 'Messages', 'Last replied by', 'Updated'].map((h) => (
+                  {['Subject', 'Customer', 'Status', 'Messages', 'Last replied by', 'Updated', ''].map((h) => (
                     <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{h}</th>
                   ))}
                 </tr>
@@ -482,20 +502,19 @@ function ConversationHistoryTab({ onOpenTicket }: { onOpenTicket: (id: string) =
                 {tickets.map((t) => (
                   <tr
                     key={t.id}
-                    className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"
-                    onClick={() => onOpenTicket(t.id)}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"
                   >
-                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100 max-w-[200px] truncate">
+                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100 max-w-[200px] truncate cursor-pointer" onClick={() => onOpenTicket(t.id)}>
                       {t.subject}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 cursor-pointer" onClick={() => onOpenTicket(t.id)}>
                       <p className="text-slate-700 dark:text-slate-200">{t.customerName}</p>
                       {t.customerPhone && <p className="text-xs text-slate-400">{t.customerPhone}</p>}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 cursor-pointer" onClick={() => onOpenTicket(t.id)}>
                       <Badge variant={STATUS_VARIANT[t.status] ?? 'default'}>{statusLabel(t.status)}</Badge>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 cursor-pointer" onClick={() => onOpenTicket(t.id)}>
                       <div className="flex items-center gap-2 text-xs">
                         <span className="rounded-full bg-brand-50 px-2 py-0.5 text-brand-700 dark:bg-brand-950/30 dark:text-brand-300">
                           {t.staffMessages} staff
@@ -505,11 +524,21 @@ function ConversationHistoryTab({ onOpenTicket }: { onOpenTicket: (id: string) =
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300 cursor-pointer" onClick={() => onOpenTicket(t.id)}>
                       {t.lastStaffName ?? <span className="text-slate-400 italic">No reply yet</span>}
                       {t.lastStaffAt && <p className="text-xs text-slate-400">{timeAgoShort(t.lastStaffAt)}</p>}
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-400">{timeAgoShort(t.updatedAt)}</td>
+                    <td className="px-4 py-3 text-xs text-slate-400 cursor-pointer" onClick={() => onOpenTicket(t.id)}>{timeAgoShort(t.updatedAt)}</td>
+                    <td className="px-4 py-3">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); deleteHistoryTicket(t.id) }}
+                        className="h-7 px-2 text-xs"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -592,17 +621,20 @@ export function SupportPage() {
   const [showMsgForm, setShowMsgForm]         = useState(false)
   const [editingMsg, setEditingMsg]           = useState<DefaultMessage | null>(null)
 
+  // Ticket selection for bulk delete
+  const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set())
+
   // ── Fetch helpers ────────────────────────────────────────────────────────────
 
-  const fetchTickets = useCallback(async (silent = false) => {
-    if (!silent) { setLoading(true); setError(null) }
+  const fetchTickets = useCallback(async () => {
+    setLoading(true); setError(null)
     try {
       const res = await api.get('/support', { params: { search, status: filter === 'All' ? undefined : filter, limit: 50 } })
       setTickets(res.data.tickets ?? [])
       setStats({ total: res.data.total ?? 0, open: res.data.open ?? 0, inProgress: res.data.inProgress ?? 0, resolved: res.data.resolved ?? 0 })
     } catch (err: any) {
-      if (!silent) setError(err.response?.data?.message ?? 'Failed to load tickets')
-    } finally { if (!silent) setLoading(false) }
+      setError(err.response?.data?.message ?? 'Failed to load tickets')
+    } finally { setLoading(false) }
   }, [search, filter])
 
   useEffect(() => { fetchTickets() }, [fetchTickets])
@@ -616,7 +648,7 @@ export function SupportPage() {
   // Poll for new tickets/messages every 5 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchTickets(true)
+      fetchTickets()
     }, 5000)
     return () => clearInterval(interval)
   }, [fetchTickets])
@@ -631,7 +663,7 @@ export function SupportPage() {
 
   // Debounced search
   useEffect(() => {
-    const t = setTimeout(() => fetchTickets(), search ? 400 : 0)
+    const t = setTimeout(fetchTickets, search ? 400 : 0)
     return () => clearTimeout(t)
     // eslint-disable-next-line
   }, [search])
@@ -702,7 +734,7 @@ export function SupportPage() {
       const res = await api.get<{ ticket: TicketDetail }>(`/support/${ticket.id}`)
       setSelected(res.data.ticket)
       // Mark customer messages as read (admin has seen them)
-      api.post(`/support/${ticket.id}/read`, {}).catch(() => {})
+      api.post(`/support/${ticket.id}/read`, { byStaff: true }).catch(() => {})
       startTypingPoll(ticket.id)
     } catch { } finally { setDetailLoading(false) }
   }
@@ -716,7 +748,7 @@ export function SupportPage() {
     try {
       const res = await api.get<{ ticket: TicketDetail }>(`/support/${id}`)
       setSelected(res.data.ticket)
-      api.post(`/support/${id}/read`, {}).catch(() => {})
+      api.post(`/support/${id}/read`, { byStaff: true }).catch(() => {})
       startTypingPoll(id)
     } catch { } finally { setDetailLoading(false) }
   }
@@ -738,15 +770,8 @@ export function SupportPage() {
 
         // Fetch new messages to update the conversation
         const res = await api.get<{ ticket: TicketDetail }>(`/support/${ticketId}`)
-        setSelected((prev) => {
-          if (!prev || prev.id !== ticketId) return prev
-          const next = res.data.ticket
-          const same = prev.status === next.status && prev.messages.length === next.messages.length &&
-            prev.messages[prev.messages.length - 1]?.id === next.messages[next.messages.length - 1]?.id
-          return same ? prev : next
-        })
-        // keep customer messages marked read while the admin has the ticket open
-        api.post(`/support/${ticketId}/read`).catch(() => {})
+        console.log('🔄 Polling ticket:', ticketId, 'Messages:', res.data.ticket.messages.length)
+        setSelected(res.data.ticket)
       } catch (err) {
         console.error('Polling error:', err)
       }
@@ -771,8 +796,8 @@ export function SupportPage() {
       const res = await api.get<{ ticket: TicketDetail }>(`/support/${selected.id}`)
       setSelected(res.data.ticket)
       // Admin just replied → they've seen the customer's messages
-      api.post(`/support/${selected.id}/read`, {}).catch(() => {})
-      fetchTickets(true)
+      api.post(`/support/${selected.id}/read`, { byStaff: true }).catch(() => {})
+      fetchTickets()
     } catch (err: any) {
       alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to send reply' })
     } finally { setSending(false) }
@@ -784,10 +809,86 @@ export function SupportPage() {
     try {
       await api.patch(`/support/${selected.id}/status`, { status })
       setSelected((s) => s ? { ...s, status: status as Ticket['status'] } : null)
-      fetchTickets(true)
+      fetchTickets()
     } catch (err: any) {
       alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to update status' })
     } finally { setChangingStatus(false) }
+  }
+
+  // Toggle ticket selection for bulk delete
+  function toggleTicketSelection(ticketId: string) {
+    setSelectedTicketIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(ticketId)) {
+        next.delete(ticketId)
+      } else {
+        next.add(ticketId)
+      }
+      return next
+    })
+  }
+
+  // Bulk delete selected tickets
+  async function deleteSelectedTickets() {
+    if (selectedTicketIds.size === 0) return
+    const confirmed = await confirmDialog({
+      title: 'Delete tickets',
+      message: `Are you sure you want to delete ${selectedTicketIds.size} ticket${selectedTicketIds.size > 1 ? 's' : ''}? This action cannot be undone.`,
+      confirmText: 'Delete',
+      confirmVariant: 'danger',
+    })
+    if (!confirmed) return
+
+    try {
+      await Promise.all(Array.from(selectedTicketIds).map((id) => api.delete(`/support/${id}`)))
+      setSelectedTicketIds(new Set())
+      fetchTickets()
+      alert({ variant: 'success', message: 'Tickets deleted successfully' })
+    } catch (err: any) {
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to delete tickets' })
+    }
+  }
+
+  // Delete single ticket (from chat view)
+  async function deleteCurrentTicket() {
+    if (!selected) return
+    const confirmed = await confirmDialog({
+      title: 'Delete ticket',
+      message: 'Are you sure you want to delete this ticket? This action cannot be undone.',
+      confirmText: 'Delete',
+      confirmVariant: 'danger',
+    })
+    if (!confirmed) return
+
+    try {
+      await api.delete(`/support/${selected.id}`)
+      setSelected(null)
+      fetchTickets()
+      alert({ variant: 'success', message: 'Ticket deleted successfully' })
+    } catch (err: any) {
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to delete ticket' })
+    }
+  }
+
+  // Clear chat (close ticket)
+  async function clearChat() {
+    if (!selected) return
+    const confirmed = await confirmDialog({
+      title: 'Close ticket',
+      message: 'Are you sure you want to close this ticket?',
+      confirmText: 'Close',
+      confirmVariant: 'warning',
+    })
+    if (!confirmed) return
+
+    try {
+      await api.patch(`/support/${selected.id}/status`, { status: 'CLOSED' })
+      setSelected((s) => s ? { ...s, status: 'CLOSED' } : null)
+      fetchTickets()
+      alert({ variant: 'success', message: 'Ticket closed successfully' })
+    } catch (err: any) {
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to close ticket' })
+    }
   }
 
   const saveSettings = async () => {
@@ -838,7 +939,7 @@ export function SupportPage() {
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Support tickets</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => fetchTickets()} disabled={loading}>
+          <Button variant="outline" onClick={fetchTickets} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
           </Button>
           <Button variant="outline" onClick={() => { setShowSettings(true); setSettingsTab('chat') }}>
@@ -923,6 +1024,17 @@ export function SupportPage() {
                 </button>
               ))}
             </div>
+            {selectedTicketIds.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={deleteSelectedTickets}
+                className="ml-auto shrink-0"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete ({selectedTicketIds.size})
+              </Button>
+            )}
           </div>
 
           {error && <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">{error}</div>}
@@ -936,48 +1048,65 @@ export function SupportPage() {
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {tickets.map((t) => (
-                <button
+                <div
                   key={t.id}
-                  type="button"
-                  onClick={() => openTicket(t)}
-                  className={`w-full p-4 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/50 ${selected?.id === t.id ? 'bg-brand-50 dark:bg-brand-950/20' : ''}`}
+                  className={`w-full p-4 transition hover:bg-slate-50 dark:hover:bg-slate-800/50 ${selected?.id === t.id ? 'bg-brand-50 dark:bg-brand-950/20' : ''}`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-slate-900 dark:text-slate-100">{t.subject}</p>
-                      <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs text-slate-500">{t.customerName}</span>
-                        {t.isGuest && <Badge variant="default">Guest</Badge>}
-                        {t.customerPhone && (
-                          <>
-                            <span className="text-xs text-slate-300 dark:text-slate-600">·</span>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setProfilePhone(t.customerPhone) }}
-                              className="flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-50 hover:text-brand-700 dark:hover:bg-brand-950/30 transition"
-                              title="View customer profile"
-                            >
-                              <Phone className="h-3 w-3" />{t.customerPhone}
-                            </button>
-                          </>
-                        )}
-                        <span className="text-xs text-slate-400">· {timeAgo(t.updatedAt)} · {t.messageCount} msg</span>
+                  <div className="flex items-start gap-3">
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={selectedTicketIds.has(t.id)}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        toggleTicketSelection(t.id)
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
+                    />
+                    {/* Ticket content */}
+                    <button
+                      type="button"
+                      onClick={() => openTicket(t)}
+                      className="flex-1 text-left"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium text-slate-900 dark:text-slate-100">{t.subject}</p>
+                          <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs text-slate-500">{t.customerName}</span>
+                            {t.customerPhone && (
+                              <>
+                                <span className="text-xs text-slate-300 dark:text-slate-600">·</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setProfilePhone(t.customerPhone) }}
+                                  className="flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-50 hover:text-brand-700 dark:hover:bg-brand-950/30 transition"
+                                  title="View customer profile"
+                                >
+                                  <Phone className="h-3 w-3" />{t.customerPhone}
+                                </button>
+                              </>
+                            )}
+                            <span className="text-xs text-slate-400">· {timeAgo(t.updatedAt)} · {t.messageCount} msg</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-shrink-0 flex-col items-end gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant={STATUS_VARIANT[t.status]}>{statusLabel(t.status)}</Badge>
+                            {t.unreadCount > 0 && (
+                              <Badge variant="danger" className="flex items-center gap-1">
+                                <Bell className="h-3 w-3" />
+                                {t.unreadCount}
+                              </Badge>
+                            )}
+                          </div>
+                          <Badge variant={PRIORITY_VARIANT[t.priority]}>{t.priority.charAt(0) + t.priority.slice(1).toLowerCase()}</Badge>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-shrink-0 flex-col items-end gap-1">
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant={STATUS_VARIANT[t.status]}>{statusLabel(t.status)}</Badge>
-                        {t.unreadCount > 0 && (
-                          <Badge variant="danger" className="flex items-center gap-1">
-                            <Bell className="h-3 w-3" />
-                            {t.unreadCount}
-                          </Badge>
-                        )}
-                      </div>
-                      <Badge variant={PRIORITY_VARIANT[t.priority]}>{t.priority.charAt(0) + t.priority.slice(1).toLowerCase()}</Badge>
-                    </div>
+                    </button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -1014,7 +1143,25 @@ export function SupportPage() {
                       )}
                     </div>
                   </div>
-                  <Badge variant={STATUS_VARIANT[selected.status]}>{statusLabel(selected.status)}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={STATUS_VARIANT[selected.status]}>{statusLabel(selected.status)}</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearChat}
+                      className="h-7 px-2 text-xs"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={deleteCurrentTicket}
+                      className="h-7 px-2 text-xs"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const).map((s) => (
