@@ -719,7 +719,7 @@ export function SupportPage() {
     } catch { } finally { setDetailLoading(false) }
   }
 
-  // Poll customer typing status for the open ticket
+  // Poll customer typing status and new messages for the open ticket
   function startTypingPoll(ticketId: string) {
     if (typingPollRef.current) clearInterval(typingPollRef.current)
     typingPollRef.current = setInterval(async () => {
@@ -730,8 +730,13 @@ export function SupportPage() {
         return
       }
       try {
-        const res = await api.get(`/support/${ticketId}/typing`)
-        setCustomerTyping(res.data.customerTyping === true)
+        // Check typing status
+        const typingRes = await api.get(`/support/${ticketId}/typing`)
+        setCustomerTyping(typingRes.data.customerTyping === true)
+
+        // Fetch new messages to update the conversation
+        const res = await api.get<{ ticket: TicketDetail }>(`/support/${ticketId}`)
+        setSelected(res.data.ticket)
       } catch { /* ignore */ }
     }, 3000)
   }
