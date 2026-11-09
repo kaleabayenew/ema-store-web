@@ -5,7 +5,7 @@ import {
   Phone, User, ShoppingBag, Wallet, CalendarDays, X,
   ShieldOff, ShieldCheck, Plus, Trash2, Edit2, MessageSquareDashed,
   History, ChevronLeft, ChevronRight, Filter,
-  Check, CheckCheck, Bell,
+  Check, CheckCheck, Bell, Paperclip, ImageIcon,
 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -40,11 +40,20 @@ interface Message {
   senderName: string
   sentAt: string
   readAt?: string | null
+  imageUrl?: string | null
 }
 
 interface TicketDetail extends Ticket {
   customerEmail: string
   messages: Message[]
+  previousTickets?: {
+    id: string
+    subject: string
+    status: string
+    messageCount: number
+    createdAt: string
+    updatedAt: string
+  }[]
 }
 
 interface SupportSettings {
@@ -248,9 +257,9 @@ function DefaultMessageForm({
   onCancel: () => void
 }) {
   const [title, setTitle] = useState(initial?.title ?? '')
-  const [body, setBody]   = useState(initial?.body ?? '')
+  const [body, setBody] = useState(initial?.body ?? '')
   const [saving, setSaving] = useState(false)
-  const [err, setErr]     = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
 
   const handleSave = async () => {
     if (!title.trim() || !body.trim()) { setErr('Title and body are required'); return }
@@ -292,22 +301,22 @@ function DefaultMessageForm({
 // ── Conversation History Tab (Super Admin only) ───────────────────────────────
 
 function ConversationHistoryTab({ onOpenTicket }: { onOpenTicket: (id: string) => void }) {
-  const [tickets, setTickets]       = useState<HistoryTicket[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [error, setError]           = useState<string | null>(null)
-  const [total, setTotal]           = useState(0)
-  const [page, setPage]             = useState(1)
+  const [tickets, setTickets] = useState<HistoryTicket[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
 
   // Filters
-  const [search, setSearch]         = useState('')
+  const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [staffId, setStaffId]       = useState('')
-  const [dateFrom, setDateFrom]     = useState('')
-  const [dateTo, setDateTo]         = useState('')
+  const [staffId, setStaffId] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
-  const [staffList, setStaffList]   = useState<StaffUser[]>([])
+  const [staffList, setStaffList] = useState<StaffUser[]>([])
 
   const confirmDialog = useConfirm()
   const alert = useAlert()
@@ -315,7 +324,7 @@ function ConversationHistoryTab({ onOpenTicket }: { onOpenTicket: (id: string) =
   useEffect(() => {
     api.get('/support/staff-users')
       .then((r) => setStaffList(r.data.staff ?? []))
-      .catch(() => {})
+      .catch(() => { })
   }, [])
 
   const fetchHistory = useCallback(async (p = 1) => {
@@ -576,39 +585,45 @@ export function SupportPage() {
   // Top-level page tab: tickets | history (super admin only)
   const [pageTab, setPageTab] = useState<'tickets' | 'history'>('tickets')
 
-  const [tickets, setTickets]     = useState<Ticket[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [error, setError]         = useState<string | null>(null)
-  const [search, setSearch]       = useState('')
-  const [filter, setFilter]       = useState<FilterStatus>('All')
-  const [stats, setStats]         = useState({ total: 0, open: 0, inProgress: 0, resolved: 0 })
+  const [tickets, setTickets] = useState<Ticket[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<FilterStatus>('All')
+  const [stats, setStats] = useState({ total: 0, open: 0, inProgress: 0, resolved: 0 })
 
-  const [selected, setSelected]             = useState<TicketDetail | null>(null)
-  const [detailLoading, setDetailLoading]   = useState(false)
-  const [reply, setReply]                   = useState('')
-  const [sending, setSending]               = useState(false)
+  const [selected, setSelected] = useState<TicketDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [reply, setReply] = useState('')
+  const [sending, setSending] = useState(false)
   const [changingStatus, setChangingStatus] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const replyRef       = useRef<HTMLInputElement>(null)
+  const replyRef = useRef<HTMLInputElement>(null)
+
+  // Image attach state
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Typing indicator (customer typing)
   const [customerTyping, setCustomerTyping] = useState(false)
-  const typingPollRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const typingPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastTypingSentRef = useRef<number>(0)
   const openTicketIdRef = useRef<string | null>(null)
 
   // / autocomplete
-  const [showSlash, setShowSlash]       = useState(false)
-  const [slashFilter, setSlashFilter]   = useState('')
-  const [slashIndex, setSlashIndex]     = useState(0)
+  const [showSlash, setShowSlash] = useState(false)
+  const [slashFilter, setSlashFilter] = useState('')
+  const [slashIndex, setSlashIndex] = useState(0)
 
   // Customer profile panel
   const [profilePhone, setProfilePhone] = useState<string | null>(null)
 
   // Settings
-  const [showSettings, setShowSettings]     = useState(false)
-  const [settingsTab, setSettingsTab]       = useState<SettingsTab>('chat')
-  const [settings, setSettings]             = useState<SupportSettings>({
+  const [showSettings, setShowSettings] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('chat')
+  const [settings, setSettings] = useState<SupportSettings>({
     welcomeMessage: 'Hello! 👋 Welcome to Ema Store customer support. How can we help you today?',
     isAutoReplyEnabled: true,
     quickStarters: ['Track my order', 'Payment issue', 'Return item', 'Speak to agent'],
@@ -616,10 +631,10 @@ export function SupportPage() {
   const [savingSettings, setSavingSettings] = useState(false)
 
   // Default messages
-  const [defaultMsgs, setDefaultMsgs]         = useState<DefaultMessage[]>([])
+  const [defaultMsgs, setDefaultMsgs] = useState<DefaultMessage[]>([])
   const [defaultMsgsLoading, setDefaultMsgsLoading] = useState(false)
-  const [showMsgForm, setShowMsgForm]         = useState(false)
-  const [editingMsg, setEditingMsg]           = useState<DefaultMessage | null>(null)
+  const [showMsgForm, setShowMsgForm] = useState(false)
+  const [editingMsg, setEditingMsg] = useState<DefaultMessage | null>(null)
 
   // Ticket selection for bulk delete
   const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set())
@@ -676,9 +691,9 @@ export function SupportPage() {
 
   const filteredSlash = slashFilter
     ? defaultMsgs.filter((m) =>
-        m.title.toLowerCase().includes(slashFilter.toLowerCase()) ||
-        m.id.toLowerCase().startsWith(slashFilter.toLowerCase())
-      )
+      m.title.toLowerCase().includes(slashFilter.toLowerCase()) ||
+      m.id.toLowerCase().startsWith(slashFilter.toLowerCase())
+    )
     : defaultMsgs
 
   // ── Reply input handler ──────────────────────────────────────────────────────
@@ -690,7 +705,7 @@ export function SupportPage() {
     // Broadcast admin typing (throttled — at most once every 2s)
     if (selected && Date.now() - lastTypingSentRef.current > 2000) {
       lastTypingSentRef.current = Date.now()
-      api.post(`/support/${selected.id}/typing`, { isStaff: true }).catch(() => {})
+      api.post(`/support/${selected.id}/typing`, { isStaff: true }).catch(() => { })
     }
 
     if (val.startsWith('/')) {
@@ -734,7 +749,7 @@ export function SupportPage() {
       const res = await api.get<{ ticket: TicketDetail }>(`/support/${ticket.id}`)
       setSelected(res.data.ticket)
       // Mark customer messages as read (admin has seen them)
-      api.post(`/support/${ticket.id}/read`, { byStaff: true }).catch(() => {})
+      api.post(`/support/${ticket.id}/read`, { byStaff: true }).catch(() => { })
       startTypingPoll(ticket.id)
     } catch { } finally { setDetailLoading(false) }
   }
@@ -748,7 +763,7 @@ export function SupportPage() {
     try {
       const res = await api.get<{ ticket: TicketDetail }>(`/support/${id}`)
       setSelected(res.data.ticket)
-      api.post(`/support/${id}/read`, { byStaff: true }).catch(() => {})
+      api.post(`/support/${id}/read`, { byStaff: true }).catch(() => { })
       startTypingPoll(id)
     } catch { } finally { setDetailLoading(false) }
   }
@@ -784,25 +799,69 @@ export function SupportPage() {
   }, [])
 
   async function sendReply() {
-    if (!reply.trim() || !selected) return
+    if ((!reply.trim() && !imageFile) || !selected) return
     if (reply.trim().length > 2000) {
       alert({ variant: 'error', message: 'Reply must be 2000 characters or fewer.' })
       return
     }
     setSending(true)
     try {
-      await api.post(`/support/${selected.id}/reply`, { body: reply.trim() })
+      let body = reply.trim()
+      let imageUrl: string | null = null
+
+      // Upload image first if one is attached
+      if (imageFile) {
+        setUploadingImage(true)
+        try {
+          const formData = new FormData()
+          formData.append('file', imageFile)
+          const uploadRes = await api.post('/support/upload-image', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 30000,
+          })
+          imageUrl = uploadRes.data.imageUrl
+        } finally {
+          setUploadingImage(false)
+        }
+        setImageFile(null)
+        setImagePreviewUrl(null)
+      }
+
+      await api.post(`/support/${selected.id}/reply`, { body, imageUrl })
       setReply('')
       const res = await api.get<{ ticket: TicketDetail }>(`/support/${selected.id}`)
       setSelected(res.data.ticket)
       // Admin just replied → they've seen the customer's messages
-      api.post(`/support/${selected.id}/read`, { byStaff: true }).catch(() => {})
+      api.post(`/support/${selected.id}/read`, { byStaff: true }).catch(() => { })
       fetchTickets()
     } catch (err: any) {
       alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to send reply' })
     } finally { setSending(false) }
   }
 
+
+  function handleImageFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      alert({ variant: 'error', message: 'Only image files are allowed.' })
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert({ variant: 'error', message: 'Image must be under 5 MB.' })
+      return
+    }
+    setImageFile(file)
+    const url = URL.createObjectURL(file)
+    setImagePreviewUrl(url)
+    e.target.value = ''
+  }
+
+  function removeImageAttachment() {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl)
+    setImageFile(null)
+    setImagePreviewUrl(null)
+  }
   async function changeStatus(status: string) {
     if (!selected) return
     setChangingStatus(true)
@@ -976,300 +1035,357 @@ export function SupportPage() {
       {/* ── Tickets tab ── */}
       {pageTab === 'tickets' && (<>
 
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: 'Total tickets',   value: stats.total,      icon: MessageSquareText, color: 'text-brand-600' },
-          { label: 'Open',            value: stats.open,       icon: AlertCircle,       color: 'text-amber-600' },
-          { label: 'In progress',     value: stats.inProgress, icon: Clock,             color: 'text-blue-600' },
-          { label: 'Resolved',        value: stats.resolved,   icon: CheckCircle2,      color: 'text-emerald-600' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{label}</span>
-              <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 ${color}`}>
-                <Icon className="h-4 w-4" />
-              </span>
+        {/* Stats */}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: 'Total tickets', value: stats.total, icon: MessageSquareText, color: 'text-brand-600' },
+            { label: 'Open', value: stats.open, icon: AlertCircle, color: 'text-amber-600' },
+            { label: 'In progress', value: stats.inProgress, icon: Clock, color: 'text-blue-600' },
+            { label: 'Resolved', value: stats.resolved, icon: CheckCircle2, color: 'text-emerald-600' },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500">{label}</span>
+                <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 ${color}`}>
+                  <Icon className="h-4 w-4" />
+                </span>
+              </div>
+              <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
             </div>
-            <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {/* Two-column layout */}
-      <div className="grid gap-6 xl:grid-cols-[1fr_440px]">
+        {/* Two-column layout */}
+        <div className="grid gap-6 xl:grid-cols-[1fr_440px]">
 
-        {/* Ticket list */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-slate-800 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search tickets…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-            </div>
-            <div className="flex gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:thin]">
-              {(['All', 'OPEN', 'IN_PROGRESS', 'RESOLVED'] as FilterStatus[]).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setFilter(f)}
-                  className={`whitespace-nowrap shrink-0 rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}
+          {/* Ticket list */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-slate-800 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search tickets…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+              </div>
+              <div className="flex gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:thin]">
+                {(['All', 'OPEN', 'IN_PROGRESS', 'RESOLVED'] as FilterStatus[]).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setFilter(f)}
+                    className={`whitespace-nowrap shrink-0 rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}
+                  >
+                    {f === 'IN_PROGRESS' ? 'In progress' : f === 'All' ? 'All' : statusLabel(f)}
+                  </button>
+                ))}
+              </div>
+              {selectedTicketIds.size > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={deleteSelectedTickets}
+                  className="ml-auto shrink-0"
                 >
-                  {f === 'IN_PROGRESS' ? 'In progress' : f === 'All' ? 'All' : statusLabel(f)}
-                </button>
-              ))}
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete ({selectedTicketIds.size})
+                </Button>
+              )}
             </div>
-            {selectedTicketIds.size > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={deleteSelectedTickets}
-                className="ml-auto shrink-0"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete ({selectedTicketIds.size})
-              </Button>
+
+            {error && <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">{error}</div>}
+
+            {loading && tickets.length === 0 ? (
+              <div className="flex items-center justify-center py-12"><Loader2 className="h-7 w-7 animate-spin text-brand-600" /></div>
+            ) : tickets.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-12 text-slate-400">
+                <MessageSquareText className="h-8 w-8" /><p className="text-sm">No tickets found.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {tickets.map((t) => (
+                  <div
+                    key={t.id}
+                    className={`w-full p-4 transition hover:bg-slate-50 dark:hover:bg-slate-800/50 ${selected?.id === t.id ? 'bg-brand-50 dark:bg-brand-950/20' : ''}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Checkbox */}
+                      <input
+                        type="checkbox"
+                        checked={selectedTicketIds.has(t.id)}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          toggleTicketSelection(t.id)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
+                      />
+                      {/* Ticket content */}
+                      <button
+                        type="button"
+                        onClick={() => openTicket(t)}
+                        className="flex-1 text-left"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium text-slate-900 dark:text-slate-100">{t.subject}</p>
+                            <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs text-slate-500">{t.customerName}</span>
+                              {t.customerPhone && (
+                                <>
+                                  <span className="text-xs text-slate-300 dark:text-slate-600">·</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setProfilePhone(t.customerPhone) }}
+                                    className="flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-50 hover:text-brand-700 dark:hover:bg-brand-950/30 transition"
+                                    title="View customer profile"
+                                  >
+                                    <Phone className="h-3 w-3" />{t.customerPhone}
+                                  </button>
+                                </>
+                              )}
+                              <span className="text-xs text-slate-400">· {timeAgo(t.updatedAt)} · {t.messageCount} msg</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-shrink-0 flex-col items-end gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <Badge variant={STATUS_VARIANT[t.status]}>{statusLabel(t.status)}</Badge>
+                              {t.unreadCount > 0 && (
+                                <Badge variant="danger" className="flex items-center gap-1">
+                                  <Bell className="h-3 w-3" />
+                                  {t.unreadCount}
+                                </Badge>
+                              )}
+                            </div>
+                            <Badge variant={PRIORITY_VARIANT[t.priority]}>{t.priority.charAt(0) + t.priority.slice(1).toLowerCase()}</Badge>
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
-          {error && <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">{error}</div>}
-
-          {loading && tickets.length === 0 ? (
-            <div className="flex items-center justify-center py-12"><Loader2 className="h-7 w-7 animate-spin text-brand-600" /></div>
-          ) : tickets.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-slate-400">
-              <MessageSquareText className="h-8 w-8" /><p className="text-sm">No tickets found.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {tickets.map((t) => (
-                <div
-                  key={t.id}
-                  className={`w-full p-4 transition hover:bg-slate-50 dark:hover:bg-slate-800/50 ${selected?.id === t.id ? 'bg-brand-50 dark:bg-brand-950/20' : ''}`}
-                >
-                  <div className="flex items-start gap-3">
-                    {/* Checkbox */}
-                    <input
-                      type="checkbox"
-                      checked={selectedTicketIds.has(t.id)}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        toggleTicketSelection(t.id)
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
-                    />
-                    {/* Ticket content */}
-                    <button
-                      type="button"
-                      onClick={() => openTicket(t)}
-                      className="flex-1 text-left"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-slate-900 dark:text-slate-100">{t.subject}</p>
-                          <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs text-slate-500">{t.customerName}</span>
-                            {t.customerPhone && (
-                              <>
-                                <span className="text-xs text-slate-300 dark:text-slate-600">·</span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); setProfilePhone(t.customerPhone) }}
-                                  className="flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-50 hover:text-brand-700 dark:hover:bg-brand-950/30 transition"
-                                  title="View customer profile"
-                                >
-                                  <Phone className="h-3 w-3" />{t.customerPhone}
-                                </button>
-                              </>
-                            )}
-                            <span className="text-xs text-slate-400">· {timeAgo(t.updatedAt)} · {t.messageCount} msg</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-shrink-0 flex-col items-end gap-1">
-                          <div className="flex items-center gap-1.5">
-                            <Badge variant={STATUS_VARIANT[t.status]}>{statusLabel(t.status)}</Badge>
-                            {t.unreadCount > 0 && (
-                              <Badge variant="danger" className="flex items-center gap-1">
-                                <Bell className="h-3 w-3" />
-                                {t.unreadCount}
-                              </Badge>
-                            )}
-                          </div>
-                          <Badge variant={PRIORITY_VARIANT[t.priority]}>{t.priority.charAt(0) + t.priority.slice(1).toLowerCase()}</Badge>
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Ticket detail / chat */}
-        <div className="flex h-[600px] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          {!selected ? (
-            <div className="flex flex-1 flex-col items-center justify-center text-slate-400">
-              <MessageSquareText className="mb-2 h-10 w-10 opacity-30" />
-              <p className="text-sm">Select a ticket to view</p>
-            </div>
-          ) : (
-            <>
-              {/* Detail header */}
-              <div className="border-b border-slate-200 p-4 dark:border-slate-800">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{selected.subject}</p>
-                    <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs text-slate-500">{selected.customerName}</span>
-                      {selected.customerPhone && (
-                        <>
-                          <span className="text-xs text-slate-300 dark:text-slate-600">·</span>
-                          <button
-                            type="button"
-                            onClick={() => setProfilePhone(selected.customerPhone)}
-                            className="flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-50 hover:text-brand-700 dark:hover:bg-brand-950/30 transition"
-                            title="View customer profile"
-                          >
-                            <Phone className="h-3 w-3" />{selected.customerPhone}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={STATUS_VARIANT[selected.status]}>{statusLabel(selected.status)}</Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={clearChat}
-                      className="h-7 px-2 text-xs"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={deleteCurrentTicket}
-                      className="h-7 px-2 text-xs"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const).map((s) => (
-                    <button
-                      key={s}
-                      disabled={s === selected.status || changingStatus}
-                      onClick={() => changeStatus(s)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${s === selected.status ? 'bg-brand-600 text-white cursor-default' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 disabled:opacity-40'}`}
-                    >
-                      {statusLabel(s)}
-                    </button>
-                  ))}
-                  {changingStatus && <Loader2 className="h-4 w-4 animate-spin text-brand-600 self-center" />}
-                </div>
+          {/* Ticket detail / chat */}
+          <div className="flex h-[600px] flex-col rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            {!selected ? (
+              <div className="flex flex-1 flex-col items-center justify-center text-slate-400">
+                <MessageSquareText className="mb-2 h-10 w-10 opacity-30" />
+                <p className="text-sm">Select a ticket to view</p>
               </div>
-
-              {/* Messages */}
-              <div className="flex-1 space-y-3 overflow-y-auto p-4">
-                {detailLoading && selected.messages.length === 0 ? (
-                  <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-brand-600" /></div>
-                ) : selected.messages.length === 0 ? (
-                  <p className="text-center text-xs text-slate-400">No messages yet.</p>
-                ) : (
-                  selected.messages.map((m) => (
-                    <div key={m.id} className={`flex ${m.isStaff ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.isStaff ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'}`}>
-                        <p className="mb-1 text-[11px] font-semibold opacity-70">{m.senderName}</p>
-                        <p className="leading-relaxed">{m.body}</p>
-                        <div className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-70">
-                          <span>{formatTime(m.sentAt)}</span>
-                          {m.isStaff && (
-                            m.readAt
-                              ? <CheckCheck className="h-3 w-3" title={`Read ${timeAgo(m.readAt)}`} />
-                              : <Check className="h-3 w-3 opacity-80" title="Sent" />
-                          )}
-                        </div>
+            ) : (
+              <>
+                {/* Detail header */}
+                <div className="border-b border-slate-200 p-4 dark:border-slate-800">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{selected.subject}</p>
+                      <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs text-slate-500">{selected.customerName}</span>
+                        {selected.customerPhone && (
+                          <>
+                            <span className="text-xs text-slate-300 dark:text-slate-600">·</span>
+                            <button
+                              type="button"
+                              onClick={() => setProfilePhone(selected.customerPhone)}
+                              className="flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-50 hover:text-brand-700 dark:hover:bg-brand-950/30 transition"
+                              title="View customer profile"
+                            >
+                              <Phone className="h-3 w-3" />{selected.customerPhone}
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
-                  ))
-                )}
-
-                {/* Customer typing indicator */}
-                {customerTyping && (
-                  <div className="flex justify-start">
-                    <div className="flex items-center gap-1 rounded-2xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.3s]" />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]" />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Reply box */}
-              <div className="border-t border-slate-200 p-3 dark:border-slate-800">
-                {/* Sender label */}
-                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500">
-                  <User className="h-3 w-3" />
-                  <span>Sending as <span className="font-medium text-slate-600 dark:text-slate-300">{senderLabel}</span></span>
-                  {defaultMsgs.length > 0 && (
-                    <span className="ml-auto text-[11px] text-slate-400">type <kbd className="rounded border border-slate-200 bg-slate-50 px-1 py-0.5 font-mono text-[10px] dark:border-slate-700 dark:bg-slate-800">/</kbd> for templates</span>
-                  )}
-                </div>
-
-                {/* Slash autocomplete popup */}
-                {showSlash && filteredSlash.length > 0 && (
-                  <div className="mb-1.5 max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                    {filteredSlash.map((msg, i) => (
-                      <button
-                        key={msg.id}
-                        type="button"
-                        onClick={() => selectSlashMsg(msg)}
-                        className={`flex w-full items-start gap-2 px-3 py-2.5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800 ${i === slashIndex ? 'bg-brand-50 dark:bg-brand-950/20' : ''}`}
+                    <div className="flex items-center gap-2">
+                      <Badge variant={STATUS_VARIANT[selected.status]}>{statusLabel(selected.status)}</Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearChat}
+                        className="h-7 px-2 text-xs"
                       >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{msg.title}</p>
-                            <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">{msg.id.slice(0, 8)}</span>
-                          </div>
-                          <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{msg.body}</p>
-                        </div>
+                        <X className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={deleteCurrentTicket}
+                        className="h-7 px-2 text-xs"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const).map((s) => (
+                      <button
+                        key={s}
+                        disabled={s === selected.status || changingStatus}
+                        onClick={() => changeStatus(s)}
+                        className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${s === selected.status ? 'bg-brand-600 text-white cursor-default' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 disabled:opacity-40'}`}
+                      >
+                        {statusLabel(s)}
                       </button>
                     ))}
+                    {changingStatus && <Loader2 className="h-4 w-4 animate-spin text-brand-600 self-center" />}
                   </div>
-                )}
-
-                <div className="flex gap-2">
-                  <input
-                    ref={replyRef}
-                    type="text"
-                    placeholder={defaultMsgs.length > 0 ? 'Reply… or type / for templates' : 'Reply…'}
-                    value={reply}
-                    onChange={handleReplyChange}
-                    onKeyDown={handleReplyKeyDown}
-                    disabled={sending || selected.status === 'CLOSED'}
-                    className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 disabled:opacity-50"
-                  />
-                  <Button size="icon" onClick={sendReply} disabled={!reply.trim() || sending || selected.status === 'CLOSED'}>
-                    {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  </Button>
                 </div>
-                {selected.status === 'CLOSED' && <p className="mt-1 text-xs text-slate-400">This ticket is closed.</p>}
-              </div>
-            </>
-          )}
+
+                {/* Messages */}
+                <div className="flex-1 space-y-3 overflow-y-auto p-4">
+                  {/* Previous tickets for context */}
+                  {selected.previousTickets && selected.previousTickets.length > 0 && (
+                    <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                      <p className="mb-2 text-xs font-semibold text-slate-600 dark:text-slate-300">Previous conversations</p>
+                      <div className="space-y-1">
+                        {selected.previousTickets.map((pt) => (
+                          <button
+                            key={pt.id}
+                            type="button"
+                            onClick={() => openTicketById(pt.id)}
+                            className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/50 transition"
+                          >
+                            <span className="truncate">{pt.subject}</span>
+                            <span className="text-[10px] text-slate-400">{timeAgo(pt.updatedAt)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {detailLoading && selected.messages.length === 0 ? (
+                    <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-brand-600" /></div>
+                  ) : selected.messages.length === 0 ? (
+                    <p className="text-center text-xs text-slate-400">No messages yet.</p>
+                  ) : (
+                    selected.messages.map((m) => (
+                      <div key={m.id} className={`flex ${m.isStaff ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.isStaff ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'}`}>
+                          <p className="mb-1 text-[11px] font-semibold opacity-70">{m.senderName}</p>
+                          {m.imageUrl && (
+                            <div className="mb-2 rounded-lg overflow-hidden">
+                              <img src={m.imageUrl} alt="Attachment" className="max-h-48 w-auto object-cover" />
+                            </div>
+                          )}
+                          {m.body && <p className="leading-relaxed">{m.body}</p>}
+                          <div className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-70">
+                            <span>{formatTime(m.sentAt)}</span>
+                            {m.isStaff && (
+                              m.readAt
+                                ? <CheckCheck className="h-3 w-3" title={`Read ${timeAgo(m.readAt)}`} />
+                                : <Check className="h-3 w-3 opacity-80" title="Sent" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+
+                  {/* Customer typing indicator */}
+                  {customerTyping && (
+                    <div className="flex justify-start">
+                      <div className="flex items-center gap-1 rounded-2xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.3s]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]" />
+                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Reply box */}
+                <div className="border-t border-slate-200 p-3 dark:border-slate-800">
+                  {/* Sender label */}
+                  <div className="mb-1.5 flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500">
+                    <User className="h-3 w-3" />
+                    <span>Sending as <span className="font-medium text-slate-600 dark:text-slate-300">{senderLabel}</span></span>
+                    {defaultMsgs.length > 0 && (
+                      <span className="ml-auto text-[11px] text-slate-400">type <kbd className="rounded border border-slate-200 bg-slate-50 px-1 py-0.5 font-mono text-[10px] dark:border-slate-700 dark:bg-slate-800">/</kbd> for templates</span>
+                    )}
+                  </div>
+
+                  {/* Slash autocomplete popup */}
+                  {showSlash && filteredSlash.length > 0 && (
+                    <div className="mb-1.5 max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                      {filteredSlash.map((msg, i) => (
+                        <button
+                          key={msg.id}
+                          type="button"
+                          onClick={() => selectSlashMsg(msg)}
+                          className={`flex w-full items-start gap-2 px-3 py-2.5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800 ${i === slashIndex ? 'bg-brand-50 dark:bg-brand-950/20' : ''}`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{msg.title}</p>
+                              <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">{msg.id.slice(0, 8)}</span>
+                            </div>
+                            <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{msg.body}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Image attachment preview */}
+                  {imagePreviewUrl && (
+                    <div className="mb-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-800">
+                      <img src={imagePreviewUrl} alt="Preview" className="h-12 w-12 rounded object-cover" />
+                      <span className="flex-1 truncate text-xs text-slate-600 dark:text-slate-300">{imageFile?.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={removeImageAttachment}
+                        className="h-6 w-6 p-0 text-slate-400 hover:text-red-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <input
+                      ref={replyRef}
+                      type="text"
+                      placeholder={defaultMsgs.length > 0 ? 'Reply… or type / for templates' : 'Reply…'}
+                      value={reply}
+                      onChange={handleReplyChange}
+                      onKeyDown={handleReplyKeyDown}
+                      disabled={sending || selected.status === 'CLOSED'}
+                      className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 disabled:opacity-50"
+                    />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileChange}
+                      className="hidden"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={sending || selected.status === 'CLOSED'}
+                      title="Attach image"
+                    >
+                      {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                    </Button>
+                    <Button size="icon" onClick={sendReply} disabled={(!reply.trim() && !imageFile) || sending || selected.status === 'CLOSED'}>
+                      {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  {selected.status === 'CLOSED' && <p className="mt-1 text-xs text-slate-400">This ticket is closed.</p>}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
       </>)}
       {/* END tickets tab */}
 
