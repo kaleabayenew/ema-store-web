@@ -14,6 +14,7 @@ import { OtpPage } from './features/auth/OtpPage'
 import { BidControlPage } from './features/bids/BidControlPage'
 import { PaymentBannersPage } from './features/banners/PaymentBannersPage'
 import { CustomersPage } from './features/customers/CustomersPage'
+import { CreditPage } from './features/credits/CreditPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { DeliveryPage } from './features/delivery/DeliveryPage'
 import { FinancePage } from './features/finance/FinancePage'
@@ -70,6 +71,7 @@ function App() {
             <Route path="/support"   element={<SupportPage />} />
             <Route path="/delivery"  element={<DeliveryPage />} />
             <Route path="/finance"   element={<FinancePage />} />
+            <Route path="/credits"   element={<CreditPage />} />
             <Route path="/approvals" element={<ApprovalsPage />} />
             <Route path="/banners"   element={<PaymentBannersPage />} />
             <Route path="/about"     element={<AboutPage />} />

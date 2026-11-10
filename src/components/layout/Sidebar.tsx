@@ -1,7 +1,7 @@
 import {
   BarChart3, Bell, Bike, Boxes, Building2, CreditCard, FileText, Flame, Gavel,
   Image, Info, LayoutDashboard, LogOut, MessageSquareText, PackageCheck,
-  Settings, ShoppingCart, Sparkles, UserRoundCog, Users, Warehouse,
+  Settings, ShoppingCart, Sparkles, UserRoundCog, Users, Wallet, Warehouse,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
@@ -35,6 +35,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       { title: 'Support',    href: '/support',   icon: MessageSquareText },
       { title: 'Delivery',   href: '/delivery',  icon: Warehouse },
       { title: 'Finance',    href: '/finance',   icon: CreditCard },
+      { title: 'Credits',    href: '/credits',   icon: Wallet },
       { title: 'Approvals',  href: '/approvals', icon: PackageCheck },
       { title: 'Banners',    href: '/banners',   icon: Image },
       { title: 'About',      href: '/about',     icon: Info },
@@ -57,11 +58,21 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const role = (user?.role ?? 'SUPER_ADMIN') as Role
+  const allowedPages = user?.allowedPages ?? []
 
   const visibleGroups = navGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => canAccessRoute(role, item.href)),
+      items: group.items.filter((item) => {
+        // Super Admin sees all pages
+        if (role === 'SUPER_ADMIN' || role === 'ADMIN') return true
+        // Other roles see pages based on allowedPages
+        if (allowedPages.length > 0) {
+          return allowedPages.includes(item.href)
+        }
+        // Fallback to role-based access
+        return canAccessRoute(role, item.href)
+      }),
     }))
     .filter((group) => group.items.length > 0)
 

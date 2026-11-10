@@ -28,9 +28,14 @@ api.interceptors.response.use(
     const originalRequest = error.config
 
     if (error.response?.status === 401) {
-      // Backend doesn't support refresh tokens - just logout immediately
-      useAuthStore.getState().logout()
-      window.location.href = '/login'
+      // Backend doesn't support refresh tokens - logout if authenticated session expired
+      const isLoginRequest = originalRequest?.url?.includes('/auth/login')
+      const isAlreadyOnLogin = window.location.pathname === '/login'
+
+      if (!isLoginRequest && !isAlreadyOnLogin) {
+        useAuthStore.getState().logout()
+        window.location.href = '/login'
+      }
     }
 
     return Promise.reject(error)

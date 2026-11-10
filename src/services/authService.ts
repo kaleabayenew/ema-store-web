@@ -22,8 +22,9 @@ export async function loginWithUsername(payload: LoginPayload): Promise<AuthSess
       id: backendData.user.id,
       name: backendData.user.fullName,
       email: backendData.user.email,
-      role: backendData.user.adminRole || 'SUPER_ADMIN',
+      role: backendData.user.adminRole || backendData.user.role || 'SUPER_ADMIN',
       locale: 'en',
+      allowedPages: backendData.user.allowedPages || [],
     }
 
     const session: AuthSession = {

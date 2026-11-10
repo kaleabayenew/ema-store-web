@@ -17,6 +17,7 @@ export interface UserProfile {
   role: Role
   avatar?: string
   locale: 'en' | 'am'
+  allowedPages?: string[]
 }
 
 export interface LoginPayload {

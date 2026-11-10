@@ -578,7 +578,7 @@ function ConversationHistoryTab({ onOpenTicket }: { onOpenTicket: (id: string) =
 
 export function SupportPage() {
   const { user } = useAuthStore()
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN'
   const confirmDialog = useConfirm()
   const alert = useAlert()
 
@@ -683,9 +683,12 @@ export function SupportPage() {
     // eslint-disable-next-line
   }, [search])
 
+  // Auto-scroll only when sending a message, not when polling
   useEffect(() => {
-    if (messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
-  }, [selected?.messages])
+    if (sending === false && selected && selected.messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [sending])
 
   // ── Slash autocomplete filtered list ─────────────────────────────────────────
 
@@ -749,7 +752,9 @@ export function SupportPage() {
       const res = await api.get<{ ticket: TicketDetail }>(`/support/${ticket.id}`)
       setSelected(res.data.ticket)
       // Mark customer messages as read (admin has seen them)
-      api.post(`/support/${ticket.id}/read`, { byStaff: true }).catch(() => { })
+      await api.post(`/support/${ticket.id}/read`, { byStaff: true }).catch(() => { })
+      // Refresh tickets to get updated unread counts from backend
+      await fetchTickets()
       startTypingPoll(ticket.id)
     } catch { } finally { setDetailLoading(false) }
   }
@@ -763,7 +768,9 @@ export function SupportPage() {
     try {
       const res = await api.get<{ ticket: TicketDetail }>(`/support/${id}`)
       setSelected(res.data.ticket)
-      api.post(`/support/${id}/read`, { byStaff: true }).catch(() => { })
+      await api.post(`/support/${id}/read`, { byStaff: true }).catch(() => { })
+      // Refresh tickets to get updated unread counts from backend
+      await fetchTickets()
       startTypingPoll(id)
     } catch { } finally { setDetailLoading(false) }
   }
@@ -984,24 +991,41 @@ export function SupportPage() {
 
   // ── Sender label ─────────────────────────────────────────────────────────────
   const senderLabel = user?.name
-    ? `${user.name}${user.role === 'SUPER_ADMIN' ? ' (Super Admin)' : user.role === 'CUSTOMER_SUPPORT' ? ' (Support)' : ''}`
+    ? `${user.name}${user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' ? ' (Super Admin)' : user.role === 'CUSTOMER_SUPPORT' ? ' (Support)' : ''}`
     : 'Staff'
 
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-screen overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
+        <div className="flex-1">
           <p className="text-sm font-medium text-brand-600">Customer support</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Support tickets</h1>
+          {/* Stats */}
+          <div className="flex gap-3 overflow-x-auto pb-1 mt-3">
+            {[
+              { label: 'Total tickets', value: stats.total, icon: MessageSquareText, color: 'text-brand-600' },
+              { label: 'Open', value: stats.open, icon: AlertCircle, color: 'text-amber-600' },
+              { label: 'In progress', value: stats.inProgress, icon: Clock, color: 'text-blue-600' },
+              { label: 'Resolved', value: stats.resolved, icon: CheckCircle2, color: 'text-emerald-600' },
+            ].map(({ label, value, icon: Icon, color }) => (
+              <div key={label} className="flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <span className={`flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800 ${color}`}>
+                  <Icon className="h-3 w-3" />
+                </span>
+                <p className="text-xs text-slate-500">{label}</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{value}</p>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchTickets} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
           </Button>
-          <Button variant="outline" onClick={() => { setShowSettings(true); setSettingsTab('chat') }}>
+          <Button variant="outline" onClick={() => { setShowSettings(true); setSettingsTab(isSuperAdmin ? 'chat' : 'defaults') }}>
             <Settings className="mr-2 h-4 w-4" />Chat Settings
           </Button>
         </div>
@@ -1035,32 +1059,12 @@ export function SupportPage() {
       {/* ── Tickets tab ── */}
       {pageTab === 'tickets' && (<>
 
-        {/* Stats */}
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            { label: 'Total tickets', value: stats.total, icon: MessageSquareText, color: 'text-brand-600' },
-            { label: 'Open', value: stats.open, icon: AlertCircle, color: 'text-amber-600' },
-            { label: 'In progress', value: stats.inProgress, icon: Clock, color: 'text-blue-600' },
-            { label: 'Resolved', value: stats.resolved, icon: CheckCircle2, color: 'text-emerald-600' },
-          ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">{label}</span>
-                <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 ${color}`}>
-                  <Icon className="h-4 w-4" />
-                </span>
-              </div>
-              <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-            </div>
-          ))}
-        </div>
-
         {/* Two-column layout */}
-        <div className="grid gap-6 xl:grid-cols-[1fr_440px]">
+        <div className="grid gap-6 xl:grid-cols-[1fr_440px] flex-1 min-h-0">
 
           {/* Ticket list */}
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-slate-800 sm:flex-row sm:items-center">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 flex flex-col min-h-0">
+            <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-slate-800 sm:flex-row sm:items-center shrink-0">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
@@ -1096,7 +1100,7 @@ export function SupportPage() {
               )}
             </div>
 
-            {error && <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">{error}</div>}
+            {error && <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400 shrink-0">{error}</div>}
 
             {loading && tickets.length === 0 ? (
               <div className="flex items-center justify-center py-12"><Loader2 className="h-7 w-7 animate-spin text-brand-600" /></div>
@@ -1105,7 +1109,7 @@ export function SupportPage() {
                 <MessageSquareText className="h-8 w-8" /><p className="text-sm">No tickets found.</p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800 overflow-y-auto flex-1">
                 {tickets.map((t) => (
                   <div
                     key={t.id}
@@ -1154,13 +1158,11 @@ export function SupportPage() {
                             <div className="flex items-center gap-1.5">
                               <Badge variant={STATUS_VARIANT[t.status]}>{statusLabel(t.status)}</Badge>
                               {t.unreadCount > 0 && (
-                                <Badge variant="danger" className="flex items-center gap-1">
-                                  <Bell className="h-3 w-3" />
+                                <Badge variant="danger">
                                   {t.unreadCount}
                                 </Badge>
                               )}
                             </div>
-                            <Badge variant={PRIORITY_VARIANT[t.priority]}>{t.priority.charAt(0) + t.priority.slice(1).toLowerCase()}</Badge>
                           </div>
                         </div>
                       </button>
@@ -1399,17 +1401,23 @@ export function SupportPage() {
             <div className="border-b border-slate-200 px-6 pt-5 dark:border-slate-800">
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Chat Settings</h2>
               <div className="flex gap-1">
-                {([['chat', 'Automation'], ['defaults', 'Default Messages']] as [SettingsTab, string][]).map(([tab, label]) => (
+                {isSuperAdmin && (
                   <button
-                    key={tab}
                     type="button"
-                    onClick={() => setSettingsTab(tab)}
-                    className={`flex items-center gap-1.5 rounded-t-lg px-4 py-2 text-sm font-medium transition border-b-2 -mb-px ${settingsTab === tab ? 'border-brand-600 text-brand-700 dark:text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                    onClick={() => setSettingsTab('chat')}
+                    className={`flex items-center gap-1.5 rounded-t-lg px-4 py-2 text-sm font-medium transition border-b-2 -mb-px ${settingsTab === 'chat' ? 'border-brand-600 text-brand-700 dark:text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                   >
-                    {tab === 'defaults' && <MessageSquareDashed className="h-4 w-4" />}
-                    {label}
+                    Automation
                   </button>
-                ))}
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSettingsTab('defaults')}
+                  className={`flex items-center gap-1.5 rounded-t-lg px-4 py-2 text-sm font-medium transition border-b-2 -mb-px ${settingsTab === 'defaults' ? 'border-brand-600 text-brand-700 dark:text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                >
+                  <MessageSquareDashed className="h-4 w-4" />
+                  Default Messages
+                </button>
               </div>
             </div>
 

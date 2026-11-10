@@ -293,21 +293,19 @@ export function UsersPage() {
                       <td className="px-4 py-3 text-slate-500 text-xs">{formatDate(u.lastLogin)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          {u.role !== 'SUPER_ADMIN' && (
-                            <button title="Edit permissions" onClick={() => openEdit(u)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 transition">
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-                          )}
-                          {u.role !== 'SUPER_ADMIN' && (
-                            <button title={u.isBlocked ? 'Unblock' : 'Block'} onClick={() => toggleBlock(u)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 transition">
-                              {u.isBlocked ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Ban className="h-4 w-4" />}
-                            </button>
-                          )}
-                          {u.role !== 'SUPER_ADMIN' && (
-                            <button title="Reset password" onClick={() => resetPassword(u)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 transition">
-                              <KeyRound className="h-4 w-4" />
-                            </button>
-                          )}
+                          {u.role !== 'SUPER_ADMIN' ? (
+                            <>
+                              <button title="Edit permissions" onClick={() => openEdit(u)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 transition">
+                                <Edit2 className="h-4 w-4" />
+                              </button>
+                              <button title={u.isBlocked ? 'Unblock' : 'Block'} onClick={() => toggleBlock(u)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 transition">
+                                {u.isBlocked ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Ban className="h-4 w-4" />}
+                              </button>
+                              <button title="Reset password" onClick={() => resetPassword(u)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 transition">
+                                <KeyRound className="h-4 w-4" />
+                              </button>
+                            </>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -318,70 +316,68 @@ export function UsersPage() {
           )}
         </div>
 
-        {/* Permission editor */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          {editing ? (
-            <div className="p-5 space-y-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Editing permissions for</p>
-                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">{nameOf(editing)}</p>
-                <span className={`inline-block mt-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${ROLE_COLORS[editing.role]}`}>{ROLE_LABELS[editing.role]}</span>
+        {/* Permission editor modal */}
+        {editing && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !saving && setEditing(null)}>
+            <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Edit permissions</h2>
+                <button onClick={() => setEditing(null)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-5 w-5" /></button>
               </div>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Editing permissions for</p>
+                  <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">{nameOf(editing)}</p>
+                  <span className={`inline-block mt-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${ROLE_COLORS[editing.role]}`}>{ROLE_LABELS[editing.role]}</span>
+                </div>
 
-              {/* Role selector */}
-              <div>
-                <Label className="mb-1.5 block text-xs font-medium text-slate-500">Role</Label>
-                <select
-                  value={editRole}
-                  onChange={(e) => setEditRole(e.target.value as Role)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                >
-                  {roleOptions.map((r) => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {editRole === 'SUPER_ADMIN' ? (
-                <p className="text-xs text-slate-500">Super Admins have access to all pages automatically.</p>
-              ) : (
-                <>
-                  <p className="text-xs text-slate-500">Tick the pages this user can access. Unticked pages will be hidden from their sidebar.</p>
-                  <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                    {allPages.map(({ route, label }) => (
-                      <label key={route} className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-3 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
-                        <input
-                          type="checkbox"
-                          checked={editPages.includes(route)}
-                          onChange={() => togglePage(route)}
-                          className="h-4 w-4 rounded border-slate-300 accent-brand-600"
-                        />
-                        <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{label}</span>
-                        <span className="ml-auto font-mono text-xs text-slate-400">{route}</span>
-                      </label>
+                {/* Role selector */}
+                <div>
+                  <Label className="mb-1.5 block text-xs font-medium text-slate-500">Role</Label>
+                  <select
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value as Role)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  >
+                    {roleOptions.map((r) => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
-                  </div>
-                </>
-              )}
+                  </select>
+                </div>
 
-              <div className="flex gap-3 pt-2">
-                <Button className="flex-1" onClick={saveEdit} disabled={saving}>
-                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Save changes
-                </Button>
-                <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>Cancel</Button>
+                {editRole === 'SUPER_ADMIN' ? (
+                  <p className="text-xs text-slate-500">Super Admins have access to all pages automatically.</p>
+                ) : (
+                  <>
+                    <p className="text-xs text-slate-500">Tick the pages this user can access. Unticked pages will be hidden from their sidebar.</p>
+                    <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                      {allPages.map(({ route, label }) => (
+                        <label key={route} className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-3 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+                          <input
+                            type="checkbox"
+                            checked={editPages.includes(route)}
+                            onChange={() => togglePage(route)}
+                            className="h-4 w-4 rounded border-slate-300 accent-brand-600"
+                          />
+                          <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{label}</span>
+                          <span className="ml-auto font-mono text-xs text-slate-400">{route}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <Button className="flex-1" onClick={saveEdit} disabled={saving}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Save changes
+                  </Button>
+                  <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>Cancel</Button>
+                </div>
               </div>
             </div>
-          ) : (
-            <div className="flex h-64 items-center justify-center text-slate-400">
-              <div className="text-center">
-                <UserRoundCog className="mx-auto mb-2 h-10 w-10 opacity-30" />
-                <p className="text-sm">Click the edit icon on a user</p>
-                <p className="text-xs mt-1">to manage their page access</p>
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Add user dialog */}
