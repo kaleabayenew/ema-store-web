@@ -112,6 +112,33 @@ export async function getCreditUsers(query: {
   return data
 }
 
+export interface AdjustBalancePayload {
+  userId: string
+  direction: 'deposit' | 'withdraw'
+  amount: number
+  note?: string
+}
+
+export interface AdjustBalanceResponse {
+  success: boolean
+  userId: string
+  direction: 'deposit' | 'withdraw'
+  amount: number
+  newBalance: number
+  transaction: {
+    id: string
+    amount: number
+    type: string
+    status: string
+    createdAt: string
+  }
+}
+
+export async function adjustCreditBalance(payload: AdjustBalancePayload): Promise<AdjustBalanceResponse> {
+  const { data } = await api.post<AdjustBalanceResponse>('/admin/credits/adjust', payload)
+  return data
+}
+
 export async function getCreditSummary(): Promise<CreditSummaryResponse> {
   const { data } = await api.get<CreditSummaryResponse>('/admin/credits/summary')
   return data
