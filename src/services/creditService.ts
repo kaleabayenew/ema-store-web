@@ -49,6 +49,7 @@ export interface CreditSummaryResponse {
 
 export interface CreditQuery {
   q?: string
+  userId?: string
   role?: CreditRole
   direction?: CreditDirection
   currency?: CreditCurrency
@@ -57,14 +58,53 @@ export interface CreditQuery {
   limit?: number
 }
 
+export interface CreditUser {
+  id: string
+  role: string | null
+  phone: string | null
+  email: string | null
+  name: string
+  balance: number
+  coins: number
+  transactionCount: number
+  lastActivityAt: string | null
+  createdAt: string
+}
+
+export interface CreditUsersResponse {
+  success: boolean
+  users: CreditUser[]
+  total: number
+  page: number
+  limit: number
+}
+
 export async function getCreditTransactions(query: CreditQuery): Promise<CreditTransactionsResponse> {
   const { data } = await api.get<CreditTransactionsResponse>('/admin/credits/transactions', {
     params: {
       q: query.q || undefined,
+      userId: query.userId || undefined,
       role: query.role && query.role !== 'ALL' ? query.role : undefined,
       direction: query.direction && query.direction !== 'all' ? query.direction : undefined,
       currency: query.currency && query.currency !== 'all' ? query.currency : undefined,
       status: query.status || undefined,
+      page: query.page ?? 1,
+      limit: query.limit ?? 20,
+    },
+  })
+  return data
+}
+
+export async function getCreditUsers(query: {
+  q?: string
+  role?: CreditRole
+  page?: number
+  limit?: number
+}): Promise<CreditUsersResponse> {
+  const { data } = await api.get<CreditUsersResponse>('/admin/credits/users', {
+    params: {
+      q: query.q || undefined,
+      role: query.role && query.role !== 'ALL' ? query.role : undefined,
       page: query.page ?? 1,
       limit: query.limit ?? 20,
     },
