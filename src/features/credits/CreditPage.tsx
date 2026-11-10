@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Coins, Search, Wallet, ChevronLeft, ChevronRight, RefreshCw, History, X } from 'lucide-react'
+import { Coins, Search, Wallet, ChevronLeft, ChevronRight, RefreshCw, History, X, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
+
+import { useAlert } from '@/components/ui/ConfirmDialog'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,6 +11,7 @@ import {
   getCreditSummary,
   getCreditTransactions,
   getCreditUsers,
+  adjustCreditBalance,
   type CreditCurrency,
   type CreditDirection,
   type CreditRole,
@@ -83,6 +86,7 @@ function Pagination({ page, totalPages, total, loading, onPage }: {
 }
 
 export function CreditPage() {
+  const alert = useAlert()
   const [view, setView] = useState<'users' | 'transactions'>('users')
   const [currency, setCurrency] = useState<CreditCurrency>('balance')
   const [direction, setDirection] = useState<CreditDirection>('all')
@@ -93,6 +97,10 @@ export function CreditPage() {
   const [page, setPage] = useState(1)
   const [userPage, setUserPage] = useState(1)
   const [selectedUser, setSelectedUser] = useState<CreditUser | null>(null)
+  const [adjustTarget, setAdjustTarget] = useState<{ user: CreditUser; direction: 'deposit' | 'withdraw' } | null>(null)
+  const [adjustAmount, setAdjustAmount] = useState('')
+  const [adjustNote, setAdjustNote] = useState('')
+  const [adjusting, setAdjusting] = useState(false)
 
   const [summary, setSummary] = useState<CreditSummaryResponse | null>(null)
   const [transactions, setTransactions] = useState<CreditTransaction[]>([])
@@ -188,6 +196,62 @@ export function CreditPage() {
   const clearUserFilter = () => {
     setSelectedUser(null)
     setPage(1)
+  }
+
+  const openAdjust = (user: CreditUser, direction: 'deposit' | 'withdraw') => {
+    setAdjustTarget({ user, direction })
+    setAdjustAmount('')
+    setAdjustNote('')
+  }
+
+  const closeAdjust = () => {
+    if (adjusting) return
+    setAdjustTarget(null)
+  }
+
+  const submitAdjust = async () => {
+    if (!adjustTarget) return
+    const amount = parseFloat(adjustAmount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert({ title: 'Invalid amount', message: 'Enter an amount greater than 0.', variant: 'error' })
+      return
+    }
+    if (adjustTarget.direction === 'withdraw' && amount > adjustTarget.user.balance) {
+      alert({
+        title: 'Insufficient balance',
+        message: `${adjustTarget.user.name} only has ${formatMoney(adjustTarget.user.balance)} available.`,
+        variant: 'error',
+      })
+      return
+    }
+
+    setAdjusting(true)
+    try {
+      const res = await adjustCreditBalance({
+        userId: adjustTarget.user.id,
+        direction: adjustTarget.direction,
+        amount,
+        note: adjustNote.trim() || undefined,
+      })
+      alert({
+        title: adjustTarget.direction === 'deposit' ? 'Deposit complete' : 'Withdrawal complete',
+        message: `${adjustTarget.direction === 'deposit' ? 'Deposited' : 'Withdrew'} ${formatMoney(amount)} for ${adjustTarget.user.name}. New balance: ${formatMoney(res.newBalance)}.`,
+        variant: 'success',
+      })
+      setAdjustTarget(null)
+      // Refresh everything affected: user balances, transactions, totals.
+      loadUsers()
+      if (view === 'transactions') loadTransactions()
+      loadSummary()
+    } catch (err) {
+      alert({
+        title: 'Adjustment failed',
+        message: err instanceof Error ? err.message : 'Could not update the balance. Please try again.',
+        variant: 'error',
+      })
+    } finally {
+      setAdjusting(false)
+    }
   }
 
   return (
@@ -393,10 +457,28 @@ export function CreditPage() {
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{u.transactionCount}</td>
                         <td className="px-4 py-3 text-slate-500">{formatDate(u.lastActivityAt)}</td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <Badge variant={roleBadgeVariant[u.role ?? ''] ?? 'default'}>
                               {roleLabel[u.role ?? ''] ?? u.role ?? '—'}
                             </Badge>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openAdjust(u, 'deposit')}
+                              title={`Deposit to ${u.name}`}
+                              className="h-8 px-2 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                            >
+                              <ArrowDownToLine className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openAdjust(u, 'withdraw')}
+                              title={`Withdraw from ${u.name}`}
+                              className="h-8 px-2 text-red-500 hover:text-red-600 dark:text-red-400"
+                            >
+                              <ArrowUpFromLine className="h-3.5 w-3.5" />
+                            </Button>
                             <Button
                               variant="outline"
                               size="sm"
@@ -471,6 +553,102 @@ export function CreditPage() {
           </>
         )}
       </div>
+
+      {/* ── Deposit / Withdraw dialog ── */}
+      {adjustTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          onClick={closeAdjust}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {adjustTarget.direction === 'deposit' ? 'Deposit funds' : 'Withdraw funds'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {adjustTarget.user.name}
+                  {adjustTarget.user.phone ? ` · ${adjustTarget.user.phone}` : ''}
+                </p>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Current balance: {formatMoney(adjustTarget.user.balance)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeAdjust}
+                disabled={adjusting}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="adjust-amount" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Amount (ETB)
+                </label>
+                <Input
+                  id="adjust-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  autoFocus
+                  value={adjustAmount}
+                  onChange={(e) => setAdjustAmount(e.target.value)}
+                  placeholder="0.00"
+                  disabled={adjusting}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="adjust-note" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Note <span className="font-normal text-slate-400">(optional)</span>
+                </label>
+                <Input
+                  id="adjust-note"
+                  type="text"
+                  maxLength={200}
+                  value={adjustNote}
+                  onChange={(e) => setAdjustNote(e.target.value)}
+                  placeholder="Reason for this adjustment"
+                  disabled={adjusting}
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={closeAdjust}
+                disabled={adjusting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className={`flex-1 ${adjustTarget.direction === 'withdraw' ? 'bg-red-600 hover:bg-red-700' : ''}`}
+                onClick={submitAdjust}
+                disabled={adjusting}
+              >
+                {adjusting
+                  ? 'Processing…'
+                  : adjustTarget.direction === 'deposit'
+                    ? 'Deposit'
+                    : 'Withdraw'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
