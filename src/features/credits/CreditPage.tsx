@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Coins, Search, Wallet, ChevronLeft, ChevronRight, RefreshCw, History, X, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
+import { Coins, Search, Wallet, ChevronLeft, ChevronRight, RefreshCw, History, X, ArrowDownToLine, ArrowUpFromLine, Package } from 'lucide-react'
 
 import { useAlert } from '@/components/ui/ConfirmDialog'
+import { useAuthStore } from '@/store/authStore'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -87,6 +88,9 @@ function Pagination({ page, totalPages, total, loading, onPage }: {
 
 export function CreditPage() {
   const alert = useAlert()
+  const { user } = useAuthStore()
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const [showStuff, setShowStuff] = useState(false)
   const [view, setView] = useState<'users' | 'transactions'>('users')
   const [currency, setCurrency] = useState<CreditCurrency>('balance')
   const [direction, setDirection] = useState<CreditDirection>('all')
@@ -261,78 +265,72 @@ export function CreditPage() {
           <p className="text-sm font-medium text-brand-600">Finance</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Credits &amp; Wallets</h1>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => { loadSummary(); view === 'users' ? loadUsers() : loadTransactions() }}
-          disabled={loading}
-        >
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <Button
+              variant={showStuff ? 'default' : 'outline'}
+              onClick={() => setShowStuff((s) => !s)}
+            >
+              <Package className="mr-2 h-4 w-4" />
+              Stuff
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => { loadSummary(); view === 'users' ? loadUsers() : loadTransactions() }}
+            disabled={loading}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
-      {/* Currency summary cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => { setCurrency('coins'); setView('transactions'); setPage(1) }}
-          className={`rounded-2xl border p-4 text-left shadow-sm transition ${
-            currency === 'coins'
-              ? 'border-brand-500 bg-brand-50 dark:border-brand-500 dark:bg-brand-950/40'
-              : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-500 dark:text-slate-400">Coin balance</span>
-            <Coins className="h-4 w-4 text-amber-500" />
+      {/* Super-admin "Stuff" panel: balance totals + per-role breakdown.
+          Refreshes automatically after every deposit/withdraw via loadSummary(). */}
+      {isSuperAdmin && showStuff && summary && (
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500 dark:text-slate-400">Total coin balance</span>
+                <Coins className="h-4 w-4 text-amber-500" />
+              </div>
+              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                {coinTotal.toLocaleString()}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500 dark:text-slate-400">Total real balance</span>
+                <Wallet className="h-4 w-4 text-emerald-500" />
+              </div>
+              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                {formatMoney(balanceTotal)}
+              </p>
+            </div>
           </div>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-            {coinTotal.toLocaleString()}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">Total coins across customers, partners &amp; riders</p>
-        </button>
 
-        <button
-          type="button"
-          onClick={() => { setCurrency('balance'); setView('transactions'); setPage(1) }}
-          className={`rounded-2xl border p-4 text-left shadow-sm transition ${
-            currency === 'balance'
-              ? 'border-brand-500 bg-brand-50 dark:border-brand-500 dark:bg-brand-950/40'
-              : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-500 dark:text-slate-400">Real balance</span>
-            <Wallet className="h-4 w-4 text-emerald-500" />
+          <div className="grid gap-3 sm:grid-cols-3">
+            {(['CUSTOMER', 'PARTNER', 'RIDE'] as const).map((r) => {
+              const s = summary.byRole[r]
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => { setRole(r); setView('users'); setUserPage(1) }}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm transition hover:border-brand-300 dark:border-slate-700 dark:bg-slate-800/50"
+                >
+                  <span className="font-medium text-slate-700 dark:text-slate-200">{roleLabel[r]}</span>
+                  <span className="ml-2 text-xs text-slate-400">{s?.users ?? 0} users</span>
+                  <div className="mt-1 flex gap-3 text-xs text-slate-500">
+                    <span>{formatMoney(s?.balance ?? 0)}</span>
+                    <span className="text-amber-600 dark:text-amber-400">{(s?.coins ?? 0).toLocaleString()} coins</span>
+                  </div>
+                </button>
+              )
+            })}
           </div>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-            {formatMoney(balanceTotal)}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">Total wallet balance (ETB) across all users</p>
-        </button>
-      </div>
-
-      {/* Per-role breakdown */}
-      {summary && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {(['CUSTOMER', 'PARTNER', 'RIDE'] as const).map((r) => {
-            const s = summary.byRole[r]
-            return (
-              <button
-                key={r}
-                type="button"
-                onClick={() => { setRole(r); setView('users'); setUserPage(1) }}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm shadow-sm transition hover:border-brand-300 dark:border-slate-800 dark:bg-slate-900"
-              >
-                <span className="font-medium text-slate-700 dark:text-slate-200">{roleLabel[r]}</span>
-                <span className="ml-2 text-xs text-slate-400">{s?.users ?? 0} users</span>
-                <div className="mt-1 flex gap-3 text-xs text-slate-500">
-                  <span>{formatMoney(s?.balance ?? 0)}</span>
-                  <span className="text-amber-600 dark:text-amber-400">{(s?.coins ?? 0).toLocaleString()} coins</span>
-                </div>
-              </button>
-            )
-          })}
         </div>
       )}
 
@@ -393,7 +391,16 @@ export function CreditPage() {
             </SelectContent>
           </Select>
           {view === 'transactions' && (
-            <Select value={status || 'ALL'} onValueChange={(v) => { setStatus(v === 'ALL' ? '' : v); setPage(1) }}>
+            <>
+              <Select value={currency} onValueChange={(v) => { setCurrency(v as CreditCurrency); setPage(1) }}>
+                <SelectTrigger className="sm:w-40"><SelectValue placeholder="Currency" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All currencies</SelectItem>
+                  <SelectItem value="balance">Real balance</SelectItem>
+                  <SelectItem value="coins">Coins</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={status || 'ALL'} onValueChange={(v) => { setStatus(v === 'ALL' ? '' : v); setPage(1) }}>
               <SelectTrigger className="sm:w-40"><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All statuses</SelectItem>
@@ -401,7 +408,8 @@ export function CreditPage() {
                 <SelectItem value="PENDING">Pending</SelectItem>
                 <SelectItem value="FAILED">Failed</SelectItem>
               </SelectContent>
-            </Select>
+              </Select>
+            </>
           )}
         </div>
 
