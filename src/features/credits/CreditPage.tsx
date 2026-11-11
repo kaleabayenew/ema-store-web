@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Coins, Search, Wallet, ChevronLeft, ChevronRight, RefreshCw, History, X, ArrowDownToLine, ArrowUpFromLine, Package } from 'lucide-react'
 
 import { useAlert } from '@/components/ui/ConfirmDialog'
+import { ROLE_LABELS } from '@/config/rbac'
 import { useAuthStore } from '@/store/authStore'
 
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +13,7 @@ import {
   getCreditSummary,
   getCreditTransactions,
   getCreditUsers,
+  getStaffUsers,
   adjustCreditBalance,
   type CreditCurrency,
   type CreditDirection,
@@ -19,6 +21,7 @@ import {
   type CreditSummaryResponse,
   type CreditTransaction,
   type CreditUser,
+  type StaffUser,
 } from '@/services/creditService'
 
 const PAGE_SIZE = 20
@@ -56,6 +59,17 @@ function formatDate(iso: string | null) {
 
 function isCoinTxn(txn: CreditTransaction) {
   return txn.type.toUpperCase().includes('COIN')
+}
+
+// Mirrors the sidebar rule for the /credits nav item: SUPER_ADMIN/ADMIN always
+// pass; other staff need '/credits' in allowedPages, falling back to the
+// role-based ROUTE_ACCESS list (MANAGEMENT, FINANCE) when allowedPages is empty.
+const CREDIT_PAGE_ROLES = new Set(['MANAGEMENT', 'FINANCE'])
+
+function canUseCreditsPage(u: StaffUser): boolean {
+  if (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN') return true
+  if (u.allowedPages.length > 0) return u.allowedPages.includes('/credits')
+  return CREDIT_PAGE_ROLES.has(u.role)
 }
 
 function isOutflow(txn: CreditTransaction) {
@@ -105,6 +119,8 @@ export function CreditPage() {
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustNote, setAdjustNote] = useState('')
   const [adjusting, setAdjusting] = useState(false)
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([])
+  const [staffLoading, setStaffLoading] = useState(false)
 
   const [summary, setSummary] = useState<CreditSummaryResponse | null>(null)
   const [transactions, setTransactions] = useState<CreditTransaction[]>([])
@@ -183,6 +199,16 @@ export function CreditPage() {
     if (view === 'users') loadUsers()
     else loadTransactions()
   }, [view, loadUsers, loadTransactions])
+
+  // Load staff users only when the Super Admin opens the "Stuff" panel.
+  useEffect(() => {
+    if (!isSuperAdmin || !showStuff || staffUsers.length > 0) return
+    setStaffLoading(true)
+    getStaffUsers()
+      .then((res) => setStaffUsers(res.users))
+      .catch(() => setStaffUsers([]))
+      .finally(() => setStaffLoading(false))
+  }, [isSuperAdmin, showStuff, staffUsers.length])
 
   const txTotalPages = Math.max(1, Math.ceil(txTotal / PAGE_SIZE))
   const userTotalPages = Math.max(1, Math.ceil(usersTotal / PAGE_SIZE))
@@ -330,6 +356,52 @@ export function CreditPage() {
                 </button>
               )
             })}
+          </div>
+
+          {/* Staff who can access the Credits page */}
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+              Credits page access
+            </h3>
+            {staffLoading ? (
+              <p className="text-sm text-slate-400">Loading staff…</p>
+            ) : (
+              (() => {
+                const allowed = staffUsers.filter(canUseCreditsPage)
+                if (allowed.length === 0) {
+                  return <p className="text-sm text-slate-400">No staff users found.</p>
+                }
+                return (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-left dark:border-slate-700">
+                          {['Name', 'Email', 'Role', 'Status'].map((h) => (
+                            <th key={h} className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allowed.map((u) => (
+                          <tr key={u.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                            <td className="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">
+                              {u.fullName || u.email || '—'}
+                            </td>
+                            <td className="px-3 py-2 text-slate-500">{u.email || '—'}</td>
+                            <td className="px-3 py-2">
+                              <Badge variant="info">{ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ?? u.role}</Badge>
+                            </td>
+                            <td className="px-3 py-2">
+                              <Badge variant={u.status === 'ACTIVE' ? 'success' : 'default'}>{u.status}</Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })()
+            )}
           </div>
         </div>
       )}
