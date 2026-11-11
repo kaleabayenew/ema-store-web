@@ -62,14 +62,10 @@ function isCoinTxn(txn: CreditTransaction) {
 // Mirrors the sidebar rule for the /credits nav item: SUPER_ADMIN/ADMIN always
 // pass; other staff need '/credits' in allowedPages, falling back to the
 // role-based ROUTE_ACCESS list (MANAGEMENT, FINANCE) when allowedPages is empty.
-const CREDIT_PAGE_ROLES = new Set(['MANAGEMENT', 'FINANCE'])
-
 function canUseCreditsPage(u: CreditUser): boolean {
   const role = (u.adminRole ?? u.role ?? '').toUpperCase()
   if (role === 'SUPER_ADMIN' || role === 'ADMIN') return true
-  const pages = u.allowedPages ?? []
-  if (pages.length > 0) return pages.includes('/credits')
-  return CREDIT_PAGE_ROLES.has(role)
+  return (u.allowedPages ?? []).includes('/credits')
 }
 
 function isOutflow(txn: CreditTransaction) {
