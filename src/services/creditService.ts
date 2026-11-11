@@ -139,6 +139,32 @@ export async function adjustCreditBalance(payload: AdjustBalancePayload): Promis
   return data
 }
 
+export interface StaffUser {
+  id: string
+  fullName: string | null
+  email: string
+  phone: string
+  role: string
+  status: string
+  allowedPages: string[]
+  lastLogin: string | null
+}
+
+export interface StaffUsersResponse {
+  success: boolean
+  users: StaffUser[]
+  total: number
+  page: number
+  totalPages: number
+}
+
+export async function getStaffUsers(): Promise<StaffUsersResponse> {
+  const { data } = await api.get<StaffUsersResponse>('/admin/users', {
+    params: { limit: 100 },
+  })
+  return data
+}
+
 export async function getCreditSummary(): Promise<CreditSummaryResponse> {
   const { data } = await api.get<CreditSummaryResponse>('/admin/credits/summary')
   return data
