@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Coins, Search, Wallet, ChevronLeft, ChevronRight, RefreshCw, History, X, ArrowDownToLine, ArrowUpFromLine, Package } from 'lucide-react'
+import { Coins, Search, Wallet, ChevronLeft, ChevronRight, RefreshCw, History, X, ArrowDownToLine, ArrowUpFromLine, Package, Save, Power } from 'lucide-react'
 
 import { useAlert } from '@/components/ui/ConfirmDialog'
 import { ROLE_LABELS } from '@/config/rbac'
 import { useAuthStore } from '@/store/authStore'
+import api from '@/lib/api'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,7 @@ import {
   getCreditUsers,
   adjustCreditBalance,
   getCoinRate,
+  updateCoinSettings,
   type CoinRate,
   type CreditCurrency,
   type CreditDirection,
@@ -106,6 +108,21 @@ export function CreditPage() {
   const [showCoin, setShowCoin] = useState(false)
   const [coinRate, setCoinRate] = useState<CoinRate | null>(null)
   const [coinRateLoading, setCoinRateLoading] = useState(false)
+  const [coinRateDraft, setCoinRateDraft] = useState('')
+  const [coinSaving, setCoinSaving] = useState(false)
+  const [coinBuyEnabled, setCoinBuyEnabled] = useState(
+    () => localStorage.getItem('coinBuyEnabled') === 'true',
+  )
+  const [coinMarked, setCoinMarked] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('coinProductIds') ?? '[]')) } catch { return new Set() }
+  })
+  const [coinProducts, setCoinProducts] = useState<any[]>([])
+  const [coinProductsTotal, setCoinProductsTotal] = useState(0)
+  const [coinProductPage, setCoinProductPage] = useState(1)
+  const [coinProductSearch, setCoinProductSearch] = useState('')
+  const [coinProductDebounced, setCoinProductDebounced] = useState('')
+  const [coinProductFilter, setCoinProductFilter] = useState('All')
+  const [coinProductsLoading, setCoinProductsLoading] = useState(false)
   const [view, setView] = useState<'users' | 'transactions'>('users')
   const [currency, setCurrency] = useState<CreditCurrency>('balance')
   const [direction, setDirection] = useState<CreditDirection>('all')
@@ -219,10 +236,82 @@ export function CreditPage() {
     if (!showCoin || coinRate) return
     setCoinRateLoading(true)
     getCoinRate()
-      .then(setCoinRate)
+      .then((r) => { setCoinRate(r); setCoinRateDraft(String(r.coinsPerUnit)) })
       .catch(() => setCoinRate(null))
       .finally(() => setCoinRateLoading(false))
   }, [showCoin, coinRate])
+
+  // Debounce the coin-product search.
+  useEffect(() => {
+    const t = setTimeout(() => setCoinProductDebounced(coinProductSearch.trim()), 400)
+    return () => clearTimeout(t)
+  }, [coinProductSearch])
+
+  // Fetch products for the "coin can buy product" picker.
+  useEffect(() => {
+    if (!showCoin || !coinBuyEnabled) return
+    setCoinProductsLoading(true)
+    api.get('/products', {
+      params: {
+        search: coinProductDebounced || undefined,
+        status: coinProductFilter === 'All' ? undefined : coinProductFilter,
+        page: coinProductPage,
+        limit: 10,
+      },
+    })
+      .then((res) => {
+        setCoinProducts(res.data.products ?? [])
+        setCoinProductsTotal(res.data.total ?? 0)
+      })
+      .catch(() => { setCoinProducts([]); setCoinProductsTotal(0) })
+      .finally(() => setCoinProductsLoading(false))
+  }, [showCoin, coinBuyEnabled, coinProductDebounced, coinProductFilter, coinProductPage])
+
+  const saveCoinRate = async () => {
+    const value = parseFloat(coinRateDraft)
+    if (!Number.isFinite(value) || value <= 0) {
+      alert({ variant: 'error', message: 'Enter a valid coins-per-ETB rate.' })
+      return
+    }
+    setCoinSaving(true)
+    try {
+      const updated = await updateCoinSettings({ coinsPerUnit: value })
+      setCoinRate(updated)
+      setCoinRateDraft(String(updated.coinsPerUnit))
+      alert({ variant: 'success', message: 'Conversion rate saved.' })
+    } catch (e: any) {
+      alert({ variant: 'error', message: e.response?.data?.message ?? 'Failed to save rate' })
+    } finally { setCoinSaving(false) }
+  }
+
+  const toggleConversion = async () => {
+    if (!coinRate) return
+    const next = !coinRate.conversionEnabled
+    try {
+      const updated = await updateCoinSettings({ conversionEnabled: next })
+      setCoinRate(updated)
+      alert({ variant: 'success', message: next ? 'Coin conversion enabled.' : 'Coin conversion disabled.' })
+    } catch (e: any) {
+      alert({ variant: 'error', message: e.response?.data?.message ?? 'Failed to update' })
+    }
+  }
+
+  const toggleCoinBuy = () => {
+    setCoinBuyEnabled((v) => {
+      localStorage.setItem('coinBuyEnabled', String(!v))
+      return !v
+    })
+    setCoinProductPage(1)
+  }
+
+  const toggleCoinProduct = (id: string) => {
+    setCoinMarked((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      localStorage.setItem('coinProductIds', JSON.stringify([...next]))
+      return next
+    })
+  }
 
   const txTotalPages = Math.max(1, Math.ceil(txTotal / PAGE_SIZE))
   const userTotalPages = Math.max(1, Math.ceil(usersTotal / PAGE_SIZE))
@@ -431,40 +520,164 @@ export function CreditPage() {
         </div>
       )}
 
-      {/* Coin panel: conversion setup (coins → ETB rate). */}
+      {/* Coin panel: conversion setup + coin-purchase product picker. */}
       {showCoin && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Conversion setup
-          </h3>
-          {coinRateLoading ? (
-            <p className="py-6 text-center text-sm text-slate-400">Loading…</p>
-          ) : coinRate ? (
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Coins per 1 ETB</span>
-                <p className="mt-2 text-2xl font-semibold text-amber-600 dark:text-amber-400">
-                  {coinRate.coinsPerUnit.toLocaleString()}
-                </p>
-              </div>
-              <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Example</span>
-                <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
-                  {coinRate.coinsPerUnit.toLocaleString()} coins = <span className="font-semibold text-emerald-600 dark:text-emerald-400">1.00 ETB</span>
-                </p>
-              </div>
-              <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">1 coin worth</span>
-                <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    {(1 / coinRate.coinsPerUnit).toFixed(4)} ETB
-                  </span>
-                </p>
-              </div>
+        <div className="space-y-4">
+          {/* Conversion setup */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Conversion setup
+              </h3>
+              {coinRate && (
+                <Button
+                  variant={coinRate.conversionEnabled === false ? 'outline' : 'default'}
+                  size="sm"
+                  onClick={toggleConversion}
+                >
+                  <Power className="mr-2 h-4 w-4" />
+                  {coinRate.conversionEnabled === false ? 'Off — enable' : 'On — disable'}
+                </Button>
+              )}
             </div>
-          ) : (
-            <p className="py-6 text-center text-sm text-slate-400">Conversion rate unavailable.</p>
-          )}
+            {coinRateLoading ? (
+              <p className="py-6 text-center text-sm text-slate-400">Loading…</p>
+            ) : coinRate ? (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Coins per 1 ETB</span>
+                    <p className="mt-2 text-2xl font-semibold text-amber-600 dark:text-amber-400">
+                      {coinRate.coinsPerUnit.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Example</span>
+                    <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
+                      {coinRate.coinsPerUnit.toLocaleString()} coins = <span className="font-semibold text-emerald-600 dark:text-emerald-400">1.00 ETB</span>
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-400">1 coin worth</span>
+                    <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        {(1 / coinRate.coinsPerUnit).toFixed(4)} ETB
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <label className="mb-1 block text-xs font-medium text-slate-500">Coins per 1 ETB</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={coinRateDraft}
+                      onChange={(e) => setCoinRateDraft(e.target.value)}
+                      placeholder="e.g. 100"
+                    />
+                  </div>
+                  <Button onClick={saveCoinRate} disabled={coinSaving}>
+                    {coinSaving ? 'Saving…' : <><Save className="mr-2 h-4 w-4" />Save rate</>}
+                  </Button>
+                </div>
+                {coinRate.conversionEnabled === false && (
+                  <p className="text-xs text-red-500">Coin conversion is currently OFF — users cannot convert coins to balance.</p>
+                )}
+              </div>
+            ) : (
+              <p className="py-6 text-center text-sm text-slate-400">Conversion rate unavailable.</p>
+            )}
+          </div>
+
+          {/* Coin can buy product — web-side setup for now */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Coin can buy product
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {coinMarked.size} product{coinMarked.size === 1 ? '' : 's'} marked
+                </p>
+              </div>
+              <Button
+                variant={coinBuyEnabled ? 'default' : 'outline'}
+                size="sm"
+                onClick={toggleCoinBuy}
+              >
+                <Power className="mr-2 h-4 w-4" />
+                {coinBuyEnabled ? 'On — hide' : 'Off — enable'}
+              </Button>
+            </div>
+            {coinBuyEnabled && (
+              <div className="space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search products…"
+                      value={coinProductSearch}
+                      onChange={(e) => { setCoinProductSearch(e.target.value); setCoinProductPage(1) }}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </div>
+                  <Select value={coinProductFilter} onValueChange={(v) => { setCoinProductFilter(v); setCoinProductPage(1) }}>
+                    <SelectTrigger className="sm:w-40"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {['All', 'APPROVED', 'PENDING', 'REJECTED'].map((s) => (
+                        <SelectItem key={s} value={s}>{s === 'All' ? 'All status' : s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left dark:border-slate-700">
+                        {['', 'Product', 'Price', 'Status', 'Stock'].map((h) => (
+                          <th key={h} className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {coinProductsLoading ? (
+                        <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">Loading…</td></tr>
+                      ) : coinProducts.length === 0 ? (
+                        <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">No products found.</td></tr>
+                      ) : coinProducts.map((p: any) => (
+                        <tr key={p.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                          <td className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              checked={coinMarked.has(p.id)}
+                              onChange={() => toggleCoinProduct(p.id)}
+                              className="h-4 w-4 rounded border-slate-300 accent-brand-600"
+                            />
+                          </td>
+                          <td className="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">{p.nameEn}</td>
+                          <td className="px-3 py-2 text-slate-500">ETB {((p.priceCents ?? 0) / 100).toFixed(2)}</td>
+                          <td className="px-3 py-2"><Badge variant={p.status === 'APPROVED' ? 'success' : p.status === 'PENDING' ? 'warning' : 'default'}>{p.status}</Badge></td>
+                          <td className="px-3 py-2 text-slate-500">{p.stock ?? 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {coinProductsTotal > 10 && (
+                  <div className="flex items-center justify-between text-sm text-slate-500">
+                    <span>Page {coinProductPage} of {Math.ceil(coinProductsTotal / 10)}</span>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" disabled={coinProductPage <= 1} onClick={() => setCoinProductPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="sm" disabled={coinProductPage >= Math.ceil(coinProductsTotal / 10)} onClick={() => setCoinProductPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
