@@ -174,3 +174,18 @@ export async function getCreditSummary(): Promise<CreditSummaryResponse> {
   const { data } = await api.get<CreditSummaryResponse>('/admin/credits/summary')
   return data
 }
+
+export interface CoinRate {
+  coinsPerUnit: number
+  updatedAt: string | null
+}
+
+export async function getCoinRate(): Promise<CoinRate> {
+  const { data } = await api.get<CoinRate>('/admin/credits/coin-rate')
+  return data
+}
+
+export async function updateCoinRate(coinsPerUnit: number): Promise<CoinRate> {
+  const { data } = await api.put<CoinRate>('/admin/credits/coin-rate', { coinsPerUnit })
+  return data
+}
