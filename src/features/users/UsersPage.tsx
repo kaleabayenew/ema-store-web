@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAlert, useConfirm, usePrompt } from '@/components/ui/ConfirmDialog'
 import { ROLE_COLORS, ROLE_LABELS } from '@/config/rbac'
+import { assignablePages } from '@/config/navigation'
 import api from '@/lib/api'
 import type { Role } from '@/types/auth'
 
@@ -36,26 +37,10 @@ interface StaffListResponse {
   totalPages: number
 }
 
-const allPages: { route: string; label: string }[] = [
-  { route: '/dashboard',   label: 'Dashboard' },
-  { route: '/customers',   label: 'Customers' },
-  { route: '/partners',    label: 'Partners' },
-  { route: '/products',    label: 'Products' },
-  { route: '/orders',      label: 'Orders' },
-  { route: '/ride',        label: 'Ride' },
-  { route: '/marketing',   label: 'Marketing' },
-  { route: '/flash-deals', label: 'Flash Deals' },
-  { route: '/bids',        label: 'Bids' },
-  { route: '/support',     label: 'Support' },
-  { route: '/finance',     label: 'Finance' },
-  { route: '/reports',     label: 'Reports' },
-  { route: '/delivery',    label: 'Delivery' },
-  { route: '/approvals',   label: 'Approvals' },
-  { route: '/banners',     label: 'Banners' },
-  { route: '/notifications', label: 'Notifications' },
-  { route: '/users',       label: 'Manage Users' },
-  { route: '/settings',    label: 'Settings' },
-]
+// All assignable pages — derived from the sidebar nav config so any new page
+// appears here automatically. Admin-group pages (Manage Users, Settings, etc.)
+// are excluded; only Super Admin can reach those.
+const allPages = assignablePages
 
 const roleOptions: { value: Role; label: string }[] = [
   { value: 'SUPER_ADMIN',      label: 'Super Admin' },
