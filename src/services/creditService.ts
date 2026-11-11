@@ -61,11 +61,14 @@ export interface CreditQuery {
 export interface CreditUser {
   id: string
   role: string | null
+  adminRole?: string | null
+  allowedPages?: string[]
   phone: string | null
   email: string | null
   name: string
   balance: number
   coins: number
+  status?: string
   transactionCount: number
   lastActivityAt: string | null
   createdAt: string
@@ -98,6 +101,7 @@ export async function getCreditTransactions(query: CreditQuery): Promise<CreditT
 export async function getCreditUsers(query: {
   q?: string
   role?: CreditRole
+  scope?: 'staff'
   page?: number
   limit?: number
 }): Promise<CreditUsersResponse> {
@@ -105,6 +109,7 @@ export async function getCreditUsers(query: {
     params: {
       q: query.q || undefined,
       role: query.role && query.role !== 'ALL' ? query.role : undefined,
+      scope: query.scope || undefined,
       page: query.page ?? 1,
       limit: query.limit ?? 20,
     },
