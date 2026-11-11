@@ -1,56 +1,11 @@
-import {
-  BarChart3, Bell, Bike, Boxes, Building2, CreditCard, FileText, Flame, Gavel,
-  Image, Info, LayoutDashboard, LogOut, MessageSquareText, PackageCheck,
-  Settings, ShoppingCart, Sparkles, UserRoundCog, Users, Wallet, Warehouse,
-} from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 
 import { canAccessRoute, ROLE_COLORS, ROLE_LABELS } from '@/config/rbac'
+import { navGroups } from '@/config/navigation'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import type { Role } from '@/types/auth'
-
-interface NavItem { title: string; href: string; icon: LucideIcon }
-
-const navGroups: { title: string; items: NavItem[] }[] = [
-  {
-    title: 'Overview',
-    items: [
-      { title: 'Dashboard',  href: '/dashboard', icon: LayoutDashboard },
-      { title: 'Reports',    href: '/reports',   icon: BarChart3 },
-    ],
-  },
-  {
-    title: 'Operations',
-    items: [
-      { title: 'Customers',  href: '/customers', icon: Users },
-      { title: 'Partners',   href: '/partners',  icon: Building2 },
-      { title: 'Products',   href: '/products',  icon: Boxes },
-      { title: 'Orders',     href: '/orders',    icon: ShoppingCart },
-      { title: 'Ride',       href: '/ride',      icon: Bike },
-      { title: 'Marketing',  href: '/marketing', icon: Sparkles },
-      { title: 'Flash Deals', href: '/flash-deals', icon: Flame },
-      { title: 'Bid Control', href: '/bids',        icon: Gavel },
-      { title: 'Support',    href: '/support',   icon: MessageSquareText },
-      { title: 'Delivery',   href: '/delivery',  icon: Warehouse },
-      { title: 'Finance',    href: '/finance',   icon: CreditCard },
-      { title: 'Credits',    href: '/credits',   icon: Wallet },
-      { title: 'Approvals',  href: '/approvals', icon: PackageCheck },
-      { title: 'Banners',    href: '/banners',   icon: Image },
-      { title: 'About',      href: '/about',     icon: Info },
-    ],
-  },
-  {
-    title: 'Admin',
-    items: [
-      { title: 'Manage Users', href: '/users',              icon: UserRoundCog },
-      { title: 'Notifications', href: '/notifications',      icon: Bell },
-      { title: 'Settings',     href: '/settings',           icon: Settings },
-      { title: 'Audit Log',    href: '/settings/audit-log', icon: FileText },
-    ],
-  },
-]
 
 interface SidebarProps { isCollapsed: boolean; onToggle: () => void }
 
