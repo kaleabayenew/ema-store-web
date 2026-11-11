@@ -13,7 +13,6 @@ import {
   getCreditSummary,
   getCreditTransactions,
   getCreditUsers,
-  getStaffUsers,
   adjustCreditBalance,
   type CreditCurrency,
   type CreditDirection,
@@ -21,7 +20,6 @@ import {
   type CreditSummaryResponse,
   type CreditTransaction,
   type CreditUser,
-  type StaffUser,
 } from '@/services/creditService'
 
 const PAGE_SIZE = 20
@@ -66,10 +64,12 @@ function isCoinTxn(txn: CreditTransaction) {
 // role-based ROUTE_ACCESS list (MANAGEMENT, FINANCE) when allowedPages is empty.
 const CREDIT_PAGE_ROLES = new Set(['MANAGEMENT', 'FINANCE'])
 
-function canUseCreditsPage(u: StaffUser): boolean {
-  if (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN') return true
-  if (u.allowedPages.length > 0) return u.allowedPages.includes('/credits')
-  return CREDIT_PAGE_ROLES.has(u.role)
+function canUseCreditsPage(u: CreditUser): boolean {
+  const role = (u.adminRole ?? u.role ?? '').toUpperCase()
+  if (role === 'SUPER_ADMIN' || role === 'ADMIN') return true
+  const pages = u.allowedPages ?? []
+  if (pages.length > 0) return pages.includes('/credits')
+  return CREDIT_PAGE_ROLES.has(role)
 }
 
 function isOutflow(txn: CreditTransaction) {
@@ -119,8 +119,8 @@ export function CreditPage() {
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustNote, setAdjustNote] = useState('')
   const [adjusting, setAdjusting] = useState(false)
-  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([])
-  const [staffLoading, setStaffLoading] = useState(false)
+  const [stuffUsers, setStuffUsers] = useState<CreditUser[]>([])
+  const [stuffLoading, setStuffLoading] = useState(false)
   const [historyTarget, setHistoryTarget] = useState<CreditUser | null>(null)
   const [historyTxns, setHistoryTxns] = useState<CreditTransaction[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -203,20 +203,15 @@ export function CreditPage() {
     else loadTransactions()
   }, [view, loadUsers, loadTransactions])
 
-  // Load staff users + the user balances table only when the Super Admin
-  // opens the "Stuff" panel.
+  // Load the staff list only when the Super Admin opens the "Stuff" panel.
   useEffect(() => {
-    if (!isSuperAdmin || !showStuff) return
-    if (staffUsers.length === 0) {
-      setStaffLoading(true)
-      getStaffUsers()
-        .then((res) => setStaffUsers(res.users))
-        .catch(() => setStaffUsers([]))
-        .finally(() => setStaffLoading(false))
-    }
-    if (users.length === 0) loadUsers()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSuperAdmin, showStuff])
+    if (!isSuperAdmin || !showStuff || stuffUsers.length > 0) return
+    setStuffLoading(true)
+    getCreditUsers({ scope: 'staff', limit: 100 })
+      .then((res) => setStuffUsers(res.users))
+      .catch(() => setStuffUsers([]))
+      .finally(() => setStuffLoading(false))
+  }, [isSuperAdmin, showStuff, stuffUsers.length])
 
   const txTotalPages = Math.max(1, Math.ceil(txTotal / PAGE_SIZE))
   const userTotalPages = Math.max(1, Math.ceil(usersTotal / PAGE_SIZE))
@@ -334,168 +329,87 @@ export function CreditPage() {
         </div>
       </div>
 
-      {/* Super-admin "Stuff" panel: balance totals + per-role breakdown.
-          Refreshes automatically after every deposit/withdraw via loadSummary(). */}
-      {isSuperAdmin && showStuff && summary && (
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500 dark:text-slate-400">Total coin balance</span>
-                <Coins className="h-4 w-4 text-amber-500" />
-              </div>
-              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-                {coinTotal.toLocaleString()}
-              </p>
-            </div>
-            <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500 dark:text-slate-400">Total real balance</span>
-                <Wallet className="h-4 w-4 text-emerald-500" />
-              </div>
-              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-                {formatMoney(balanceTotal)}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            {(['CUSTOMER', 'PARTNER', 'RIDE'] as const).map((r) => {
-              const s = summary.byRole[r]
+      {/* Super-admin "Stuff" panel: staff who can access the Credits page,
+          with balance and deposit/withdraw/transaction actions. */}
+      {isSuperAdmin && showStuff && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Credits page access
+          </h3>
+          {stuffLoading ? (
+            <p className="py-6 text-center text-sm text-slate-400">Loading staff…</p>
+          ) : (
+            (() => {
+              const allowed = stuffUsers.filter(canUseCreditsPage)
+              if (allowed.length === 0) {
+                return <p className="py-6 text-center text-sm text-slate-400">No staff users found.</p>
+              }
               return (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => { setRole(r); setView('users'); setUserPage(1) }}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm transition hover:border-brand-300 dark:border-slate-700 dark:bg-slate-800/50"
-                >
-                  <span className="font-medium text-slate-700 dark:text-slate-200">{roleLabel[r]}</span>
-                  <span className="ml-2 text-xs text-slate-400">{s?.users ?? 0} users</span>
-                  <div className="mt-1 flex gap-3 text-xs text-slate-500">
-                    <span>{formatMoney(s?.balance ?? 0)}</span>
-                    <span className="text-amber-600 dark:text-amber-400">{(s?.coins ?? 0).toLocaleString()} coins</span>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* User balances with actions — same deposit/withdraw/history popups */}
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-              User balances
-            </h3>
-            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left dark:border-slate-700">
-                    {['User', 'Role', 'Balance', 'Coins', 'Actions'].map((h) => (
-                      <th key={h} className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">Loading…</td></tr>
-                  ) : users.length === 0 ? (
-                    <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">No users found.</td></tr>
-                  ) : (
-                    users.map((u) => (
-                      <tr key={u.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
-                        <td className="px-3 py-2">
-                          <div className="font-medium text-slate-900 dark:text-slate-100">{u.name}</div>
-                          <div className="text-xs text-slate-400">{u.phone ?? u.email ?? '—'}</div>
-                        </td>
-                        <td className="px-3 py-2">
-                          <Badge variant={roleBadgeVariant[u.role ?? ''] ?? 'default'}>
-                            {roleLabel[u.role ?? ''] ?? u.role ?? '—'}
-                          </Badge>
-                        </td>
-                        <td className="px-3 py-2 font-semibold text-emerald-600 dark:text-emerald-400">{formatMoney(u.balance)}</td>
-                        <td className="px-3 py-2 font-semibold text-amber-600 dark:text-amber-400">{u.coins.toLocaleString()}</td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-1.5">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openAdjust(u, 'deposit')}
-                              title={`Deposit to ${u.name}`}
-                              className="h-8 px-2 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
-                            >
-                              <ArrowDownToLine className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openAdjust(u, 'withdraw')}
-                              title={`Withdraw from ${u.name}`}
-                              className="h-8 px-2 text-red-500 hover:text-red-600 dark:text-red-400"
-                            >
-                              <ArrowUpFromLine className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openHistory(u)}
-                              title="View transactions"
-                            >
-                              <History className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Staff who can access the Credits page */}
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-              Credits page access
-            </h3>
-            {staffLoading ? (
-              <p className="text-sm text-slate-400">Loading staff…</p>
-            ) : (
-              (() => {
-                const allowed = staffUsers.filter(canUseCreditsPage)
-                if (allowed.length === 0) {
-                  return <p className="text-sm text-slate-400">No staff users found.</p>
-                }
-                return (
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-left dark:border-slate-700">
-                          {['Name', 'Email', 'Role', 'Status'].map((h) => (
-                            <th key={h} className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allowed.map((u) => (
-                          <tr key={u.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
-                            <td className="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">
-                              {u.fullName || u.email || '—'}
-                            </td>
-                            <td className="px-3 py-2 text-slate-500">{u.email || '—'}</td>
-                            <td className="px-3 py-2">
-                              <Badge variant="info">{ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ?? u.role}</Badge>
-                            </td>
-                            <td className="px-3 py-2">
-                              <Badge variant={u.status === 'ACTIVE' ? 'success' : 'default'}>{u.status}</Badge>
-                            </td>
-                          </tr>
+                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left dark:border-slate-700">
+                        {['Name', 'Email', 'Role', 'Status', 'Balance', 'Actions'].map((h) => (
+                          <th key={h} className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">{h}</th>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )
-              })()
-            )}
-          </div>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allowed.map((u) => (
+                        <tr key={u.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                          <td className="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">
+                            {u.name}
+                          </td>
+                          <td className="px-3 py-2 text-slate-500">{u.email || '—'}</td>
+                          <td className="px-3 py-2">
+                            <Badge variant="info">
+                              {ROLE_LABELS[(u.adminRole ?? u.role ?? '') as keyof typeof ROLE_LABELS] ?? u.role ?? '—'}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-2">
+                            <Badge variant={u.status === 'ACTIVE' ? 'success' : 'default'}>{u.status ?? '—'}</Badge>
+                          </td>
+                          <td className="px-3 py-2 font-semibold text-emerald-600 dark:text-emerald-400">
+                            {formatMoney(u.balance)}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openAdjust(u, 'deposit')}
+                                title={`Deposit to ${u.name}`}
+                                className="h-8 px-2 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                              >
+                                <ArrowDownToLine className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openAdjust(u, 'withdraw')}
+                                title={`Withdraw from ${u.name}`}
+                                className="h-8 px-2 text-red-500 hover:text-red-600 dark:text-red-400"
+                              >
+                                <ArrowUpFromLine className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openHistory(u)}
+                                title="View transactions"
+                              >
+                                <History className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()
+          )}
         </div>
       )}
 
