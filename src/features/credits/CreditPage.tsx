@@ -15,9 +15,10 @@ import {
   getCreditTransactions,
   getCreditUsers,
   adjustCreditBalance,
-  getCoinRate,
+  getCoinSettings,
   updateCoinSettings,
-  type CoinRate,
+  setProductCoinPrice,
+  type CoinSettings,
   type CreditCurrency,
   type CreditDirection,
   type CreditRole,
@@ -106,13 +107,14 @@ export function CreditPage() {
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const [showStuff, setShowStuff] = useState(false)
   const [showCoin, setShowCoin] = useState(false)
-  const [coinRate, setCoinRate] = useState<CoinRate | null>(null)
+  const [coinRate, setCoinRate] = useState<CoinSettings | null>(null)
   const [coinRateLoading, setCoinRateLoading] = useState(false)
   const [coinRateDraft, setCoinRateDraft] = useState('')
+  const [inviteGiftDraft, setInviteGiftDraft] = useState('')
   const [coinSaving, setCoinSaving] = useState(false)
-  const [coinBuyEnabled, setCoinBuyEnabled] = useState(
-    () => localStorage.getItem('coinBuyEnabled') === 'true',
-  )
+  const [coinPriceDrafts, setCoinPriceDrafts] = useState<Record<string, string>>({})
+  const [coinPriceSaving, setCoinPriceSaving] = useState<string | null>(null)
+  const [coinBuyEnabled, setCoinBuyEnabled] = useState(false)
   const [coinMarked, setCoinMarked] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('coinProductIds') ?? '[]')) } catch { return new Set() }
   })
@@ -231,12 +233,17 @@ export function CreditPage() {
       .finally(() => setStuffLoading(false))
   }, [isSuperAdmin, showStuff, stuffUsers.length])
 
-  // Load the coin conversion rate when the Coin panel opens.
+  // Load the coin settings when the Coin panel opens.
   useEffect(() => {
     if (!showCoin || coinRate) return
     setCoinRateLoading(true)
-    getCoinRate()
-      .then((r) => { setCoinRate(r); setCoinRateDraft(String(r.coinsPerUnit)) })
+    getCoinSettings()
+      .then((r) => {
+        setCoinRate(r)
+        setCoinRateDraft(String(r.coinsPerUnit))
+        setInviteGiftDraft(String(r.inviteGiftCoins))
+        setCoinBuyEnabled(r.coinBuyEnabled)
+      })
       .catch(() => setCoinRate(null))
       .finally(() => setCoinRateLoading(false))
   }, [showCoin, coinRate])
@@ -296,12 +303,64 @@ export function CreditPage() {
     }
   }
 
-  const toggleCoinBuy = () => {
-    setCoinBuyEnabled((v) => {
-      localStorage.setItem('coinBuyEnabled', String(!v))
-      return !v
-    })
+  const saveInviteGift = async () => {
+    const value = parseInt(inviteGiftDraft, 10)
+    if (!Number.isFinite(value) || value < 0) {
+      alert({ variant: 'error', message: 'Enter a valid coin amount.' })
+      return
+    }
+    setCoinSaving(true)
+    try {
+      const updated = await updateCoinSettings({ inviteGiftCoins: value })
+      setCoinRate(updated)
+      setInviteGiftDraft(String(updated.inviteGiftCoins))
+      alert({ variant: 'success', message: 'Invite gift saved.' })
+    } catch (e: any) {
+      alert({ variant: 'error', message: e.response?.data?.message ?? 'Failed to save' })
+    } finally { setCoinSaving(false) }
+  }
+
+  const toggleInviteGift = async () => {
+    if (!coinRate) return
+    const next = !coinRate.inviteGiftEnabled
+    try {
+      const updated = await updateCoinSettings({ inviteGiftEnabled: next })
+      setCoinRate(updated)
+      alert({ variant: 'success', message: next ? 'Invite gift enabled.' : 'Invite gift disabled.' })
+    } catch (e: any) {
+      alert({ variant: 'error', message: e.response?.data?.message ?? 'Failed to update' })
+    }
+  }
+
+  const toggleCoinBuy = async () => {
+    const next = !coinBuyEnabled
+    try {
+      const updated = await updateCoinSettings({ coinBuyEnabled: next })
+      setCoinRate(updated)
+      setCoinBuyEnabled(updated.coinBuyEnabled)
+      localStorage.setItem('coinBuyEnabled', String(updated.coinBuyEnabled))
+      alert({ variant: 'success', message: next ? 'Coin purchases enabled.' : 'Coin purchases disabled.' })
+    } catch (e: any) {
+      alert({ variant: 'error', message: e.response?.data?.message ?? 'Failed to update' })
+    }
     setCoinProductPage(1)
+  }
+
+  const saveCoinPrice = async (productId: string) => {
+    const raw = coinPriceDrafts[productId]
+    const value = raw === undefined || raw.trim() === '' ? null : parseInt(raw, 10)
+    if (value !== null && (!Number.isFinite(value) || value < 0)) {
+      alert({ variant: 'error', message: 'Enter a valid coin price (or leave empty).' })
+      return
+    }
+    setCoinPriceSaving(productId)
+    try {
+      const res = await setProductCoinPrice(productId, value)
+      setCoinProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, coinPrice: res.coinPrice, coin_price: res.coinPrice } : p)))
+      alert({ variant: 'success', message: 'Coin price saved.' })
+    } catch (e: any) {
+      alert({ variant: 'error', message: e.response?.data?.message ?? 'Failed to save coin price' })
+    } finally { setCoinPriceSaving(null) }
   }
 
   const toggleCoinProduct = (id: string) => {
@@ -591,6 +650,54 @@ export function CreditPage() {
             )}
           </div>
 
+          {/* Invite gift */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Invite gift
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Coins both users earn when a referral is used
+                </p>
+              </div>
+              {coinRate && (
+                <Button
+                  variant={coinRate.inviteGiftEnabled ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={toggleInviteGift}
+                >
+                  <Power className="mr-2 h-4 w-4" />
+                  {coinRate.inviteGiftEnabled ? 'On — disable' : 'Off — enable'}
+                </Button>
+              )}
+            </div>
+            {coinRateLoading ? (
+              <p className="py-4 text-center text-sm text-slate-400">Loading…</p>
+            ) : coinRate ? (
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-medium text-slate-500">Coins per invite</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={inviteGiftDraft}
+                    onChange={(e) => setInviteGiftDraft(e.target.value)}
+                    placeholder="e.g. 50"
+                    disabled={!coinRate.inviteGiftEnabled}
+                  />
+                </div>
+                <Button onClick={saveInviteGift} disabled={coinSaving || !coinRate.inviteGiftEnabled}>
+                  {coinSaving ? 'Saving…' : <><Save className="mr-2 h-4 w-4" />Save</>}
+                </Button>
+              </div>
+            ) : null}
+            {coinRate?.inviteGiftEnabled === false && (
+              <p className="mt-2 text-xs text-red-500">Invite rewards are OFF — referrals earn no coins.</p>
+            )}
+          </div>
+
           {/* Coin can buy product — web-side setup for now */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="mb-3 flex items-center justify-between">
@@ -637,16 +744,16 @@ export function CreditPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-200 text-left dark:border-slate-700">
-                        {['', 'Product', 'Price', 'Status', 'Stock'].map((h) => (
+                        {['', 'Product', 'Price', 'Coin price', 'Status', 'Stock'].map((h) => (
                           <th key={h} className="px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {coinProductsLoading ? (
-                        <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">Loading…</td></tr>
+                        <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-400">Loading…</td></tr>
                       ) : coinProducts.length === 0 ? (
-                        <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-400">No products found.</td></tr>
+                        <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-400">No products found.</td></tr>
                       ) : coinProducts.map((p: any) => (
                         <tr key={p.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
                           <td className="px-3 py-2">
@@ -659,6 +766,29 @@ export function CreditPage() {
                           </td>
                           <td className="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">{p.nameEn}</td>
                           <td className="px-3 py-2 text-slate-500">ETB {((p.priceCents ?? 0) / 100).toFixed(2)}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="1"
+                                className="h-8 w-24 text-xs"
+                                placeholder="coins"
+                                value={coinPriceDrafts[p.id] ?? (p.coinPrice ?? p.coin_price ?? '')}
+                                onChange={(e) => setCoinPriceDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2"
+                                disabled={coinPriceSaving === p.id}
+                                onClick={() => saveCoinPrice(p.id)}
+                                title="Save coin price"
+                              >
+                                {coinPriceSaving === p.id ? '…' : <Save className="h-3.5 w-3.5" />}
+                              </Button>
+                            </div>
+                          </td>
                           <td className="px-3 py-2"><Badge variant={p.status === 'APPROVED' ? 'success' : p.status === 'PENDING' ? 'warning' : 'default'}>{p.status}</Badge></td>
                           <td className="px-3 py-2 text-slate-500">{p.stock ?? 0}</td>
                         </tr>
