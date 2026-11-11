@@ -14,6 +14,8 @@ import {
   getCreditTransactions,
   getCreditUsers,
   adjustCreditBalance,
+  getCoinRate,
+  type CoinRate,
   type CreditCurrency,
   type CreditDirection,
   type CreditRole,
@@ -101,6 +103,9 @@ export function CreditPage() {
   const { user } = useAuthStore()
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const [showStuff, setShowStuff] = useState(false)
+  const [showCoin, setShowCoin] = useState(false)
+  const [coinRate, setCoinRate] = useState<CoinRate | null>(null)
+  const [coinRateLoading, setCoinRateLoading] = useState(false)
   const [view, setView] = useState<'users' | 'transactions'>('users')
   const [currency, setCurrency] = useState<CreditCurrency>('balance')
   const [direction, setDirection] = useState<CreditDirection>('all')
@@ -209,6 +214,16 @@ export function CreditPage() {
       .finally(() => setStuffLoading(false))
   }, [isSuperAdmin, showStuff, stuffUsers.length])
 
+  // Load the coin conversion rate when the Coin panel opens.
+  useEffect(() => {
+    if (!showCoin || coinRate) return
+    setCoinRateLoading(true)
+    getCoinRate()
+      .then(setCoinRate)
+      .catch(() => setCoinRate(null))
+      .finally(() => setCoinRateLoading(false))
+  }, [showCoin, coinRate])
+
   const txTotalPages = Math.max(1, Math.ceil(txTotal / PAGE_SIZE))
   const userTotalPages = Math.max(1, Math.ceil(usersTotal / PAGE_SIZE))
   const coinTotal = summary?.totalCoins ?? 0
@@ -305,6 +320,13 @@ export function CreditPage() {
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Credits &amp; Wallets</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant={showCoin ? 'default' : 'outline'}
+            onClick={() => setShowCoin((s) => !s)}
+          >
+            <Coins className="mr-2 h-4 w-4" />
+            Coin
+          </Button>
           {isSuperAdmin && (
             <Button
               variant={showStuff ? 'default' : 'outline'}
@@ -409,8 +431,45 @@ export function CreditPage() {
         </div>
       )}
 
-      {/* Main card — hidden while the Super Admin "Stuff" panel is open */}
-      {!(isSuperAdmin && showStuff) && (
+      {/* Coin panel: conversion setup (coins → ETB rate). */}
+      {showCoin && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Conversion setup
+          </h3>
+          {coinRateLoading ? (
+            <p className="py-6 text-center text-sm text-slate-400">Loading…</p>
+          ) : coinRate ? (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Coins per 1 ETB</span>
+                <p className="mt-2 text-2xl font-semibold text-amber-600 dark:text-amber-400">
+                  {coinRate.coinsPerUnit.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Example</span>
+                <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
+                  {coinRate.coinsPerUnit.toLocaleString()} coins = <span className="font-semibold text-emerald-600 dark:text-emerald-400">1.00 ETB</span>
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">1 coin worth</span>
+                <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    {(1 / coinRate.coinsPerUnit).toFixed(4)} ETB
+                  </span>
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="py-6 text-center text-sm text-slate-400">Conversion rate unavailable.</p>
+          )}
+        </div>
+      )}
+
+      {/* Main card — hidden while the Super Admin "Stuff" or Coin panel is open */}
+      {!(isSuperAdmin && showStuff) && !showCoin && (
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         {/* View tabs */}
         <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-4 pt-3 dark:border-slate-800">
