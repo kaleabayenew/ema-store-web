@@ -31,6 +31,20 @@ interface Ticket {
   unreadCount: number
   createdAt: string
   updatedAt: string
+  isPartner?: boolean
+  userRole?: string
+  shopName?: string | null
+}
+
+function isPartnerTicket(ticketOrSubject: Ticket | TicketDetail | string | null | undefined) {
+  if (!ticketOrSubject) return false
+  if (typeof ticketOrSubject === 'string') {
+    return ticketOrSubject.toLowerCase().includes('partner')
+  }
+  return !!ticketOrSubject.isPartner ||
+    ticketOrSubject.userRole === 'PARTNER' ||
+    !!ticketOrSubject.shopName ||
+    ticketOrSubject.subject?.toLowerCase().includes('partner')
 }
 
 interface Message {
@@ -41,6 +55,7 @@ interface Message {
   sentAt: string
   readAt?: string | null
   imageUrl?: string | null
+  isPartner?: boolean
 }
 
 interface TicketDetail extends Ticket {
@@ -1137,6 +1152,11 @@ export function SupportPage() {
                           <div className="min-w-0 flex-1">
                             <p className="truncate font-medium text-slate-900 dark:text-slate-100">{t.subject}</p>
                             <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                              {isPartnerTicket(t) && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                  🏪 Partner{t.shopName ? ` · ${t.shopName}` : ''}
+                                </span>
+                              )}
                               <span className="text-xs text-slate-500">{t.customerName}</span>
                               {t.customerPhone && (
                                 <>
@@ -1188,6 +1208,11 @@ export function SupportPage() {
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{selected.subject}</p>
                       <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        {isPartnerTicket(selected) && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                            🏪 Partner (Seller){selected.shopName ? ` · ${selected.shopName}` : ''}
+                          </span>
+                        )}
                         <span className="text-xs text-slate-500">{selected.customerName}</span>
                         {selected.customerPhone && (
                           <>
@@ -1268,8 +1293,15 @@ export function SupportPage() {
                   ) : (
                     selected.messages.map((m) => (
                       <div key={m.id} className={`flex ${m.isStaff ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.isStaff ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'}`}>
-                          <p className="mb-1 text-[11px] font-semibold opacity-70">{m.senderName}</p>
+                        <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.isStaff
+                            ? 'bg-brand-600 text-white'
+                            : (m.isPartner || isPartnerTicket(selected))
+                              ? 'bg-amber-100 text-amber-950 dark:bg-amber-950/40 dark:text-amber-100 border border-amber-200 dark:border-amber-800'
+                              : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
+                          }`}>
+                          <p className="mb-1 text-[11px] font-semibold opacity-70">
+                            {(m.isPartner || isPartnerTicket(selected)) ? `🏪 ${m.senderName || 'Partner'}` : m.senderName}
+                          </p>
                           {m.imageUrl && (
                             <div className="mb-2 rounded-lg overflow-hidden">
                               <img src={m.imageUrl} alt="Attachment" className="max-h-48 w-auto object-cover" />
