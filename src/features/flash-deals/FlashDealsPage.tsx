@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Flame, Clock, Tag, Plus, Trash2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Flame, Clock, Tag, Plus, Trash2, Loader2 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -45,6 +45,91 @@ const toLocalInput = (d: Date) => {
 
 const inputClass =
   'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100'
+
+// ─── Image field: URL input + device upload button ────────────────────────────
+function DealImageField({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (url: string) => void
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('folder', 'flash-deals')
+
+      const res = await api.post('/upload', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      onChange(res.data.url)
+    } catch (err: any) {
+      setUploadError(err.response?.data?.message ?? 'Upload failed')
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input
+          id="deal-image"
+          type="url"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="https://..."
+          className={inputClass}
+        />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFile}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0 px-3"
+          disabled={uploading}
+          onClick={() => fileRef.current?.click()}
+          title="Upload image from device"
+        >
+          {uploading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+
+      {uploadError && (
+        <p className="text-xs text-red-500">{uploadError}</p>
+      )}
+
+      {value && (
+        <img
+          src={value}
+          alt="Deal preview"
+          className="h-20 w-32 rounded-xl border border-slate-200 object-cover dark:border-slate-700"
+        />
+      )}
+    </div>
+  )
+}
 
 export function FlashDealsPage() {
   const confirmDialog = useConfirm()
@@ -433,13 +518,9 @@ export function FlashDealsPage() {
                 <label htmlFor="deal-image" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Image URL <span className="text-slate-400">(optional)</span>
                 </label>
-                <input
-                  id="deal-image"
-                  type="url"
+                <DealImageField
                   value={form.image_url}
-                  onChange={(e) => updateForm('image_url', e.target.value)}
-                  placeholder="https://..."
-                  className={inputClass}
+                  onChange={(url) => updateForm('image_url', url)}
                 />
               </div>
 
