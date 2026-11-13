@@ -19,6 +19,7 @@ import { DashboardPage } from './features/dashboard/DashboardPage'
 import { DeliveryPage } from './features/delivery/DeliveryPage'
 import { FinancePage } from './features/finance/FinancePage'
 import { FlashDealsPage } from './features/flash-deals/FlashDealsPage'
+import { IntegrationsPage } from './features/integrations/IntegrationsPage'
 import { MarketingPage } from './features/marketing/MarketingPage'
 import { NotificationsPage } from './features/notifications/NotificationsPage'
 import { OrdersPage } from './features/orders/OrdersPage'
@@ -79,6 +80,7 @@ function App() {
 
             {/* Admin */}
             <Route path="/users"    element={<UsersPage />} />
+            <Route path="/integrations" element={<IntegrationsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/settings/audit-log" element={<SettingsPage />} />
 

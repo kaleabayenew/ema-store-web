@@ -1,6 +1,6 @@
 import {
   BarChart3, Bell, Bike, Boxes, Building2, CreditCard, FileText, Flame, Gavel,
-  Image, Info, LayoutDashboard, MessageSquareText, PackageCheck,
+  Image, Info, LayoutDashboard, MessageSquareText, PackageCheck, Plug,
   Settings, ShoppingCart, Sparkles, UserRoundCog, Users, Wallet, Warehouse,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -40,6 +40,7 @@ export const navGroups: { title: string; items: NavItem[] }[] = [
     items: [
       { title: 'Manage Users', href: '/users',              icon: UserRoundCog },
       { title: 'Notifications', href: '/notifications',      icon: Bell },
+      { title: 'API',          href: '/integrations',       icon: Plug },
       { title: 'Settings',     href: '/settings',           icon: Settings },
       { title: 'Audit Log',    href: '/settings/audit-log', icon: FileText },
     ],
@@ -47,7 +48,7 @@ export const navGroups: { title: string; items: NavItem[] }[] = [
 ]
 
 // Pages that can be granted to non-super-admin staff — everything except the
-// Admin group (Manage Users, Notifications, Settings, Audit Log).
+// Admin group (Manage Users, Notifications, API, Settings, Audit Log).
 export const assignablePages: { route: string; label: string }[] = navGroups
   .filter((g) => g.title !== 'Admin')
   .flatMap((g) => g.items.map((i) => ({ route: i.href, label: i.title })))

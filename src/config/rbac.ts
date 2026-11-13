@@ -24,6 +24,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   '/users': ['SUPER_ADMIN'],
   '/settings': ['SUPER_ADMIN'],
   '/settings/audit-log': ['SUPER_ADMIN'],
+  '/integrations': ['SUPER_ADMIN'],
   '/profile': ['SUPER_ADMIN', 'MANAGEMENT', 'CUSTOMER_SUPPORT', 'PARTNER_MANAGER', 'PRODUCT_MANAGER', 'FINANCE'],
   '/wallet': ['SUPER_ADMIN'],
   '/payment-methods': ['SUPER_ADMIN'],
