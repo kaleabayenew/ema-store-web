@@ -47,36 +47,67 @@ const inputClass =
   'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100'
 
 // ─── Image field: URL input + device upload button ────────────────────────────
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']
+
 function DealImageField({
   value,
   onChange,
+  onUploadingChange,
 }: {
   value: string
   onChange: (url: string) => void
+  onUploadingChange?: (uploading: boolean) => void
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [previewFailed, setPreviewFailed] = useState(false)
+
+  useEffect(() => {
+    setPreviewFailed(false)
+  }, [value])
+
+  const setBusy = (busy: boolean) => {
+    setUploading(busy)
+    onUploadingChange?.(busy)
+  }
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    setUploading(true)
+    // Validate on the client first for instant feedback
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setUploadError('Please choose a JPG, PNG, WEBP, GIF or AVIF image.')
+      if (fileRef.current) fileRef.current.value = ''
+      return
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setUploadError('Image is too large. Maximum size is 5MB.')
+      if (fileRef.current) fileRef.current.value = ''
+      return
+    }
+
+    setBusy(true)
     setUploadError(null)
     try {
       const form = new FormData()
-      form.append('file', file)
       form.append('folder', 'flash-deals')
+      form.append('file', file)
 
-      const res = await api.post('/upload', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      // Do NOT set Content-Type manually: the browser must add the multipart boundary.
+      const res = await api.post('/upload', form, { timeout: 60000 })
+      if (!res.data?.url) throw new Error('No URL returned')
       onChange(res.data.url)
-    } catch (err: any) {
-      setUploadError(err.response?.data?.message ?? 'Upload failed')
+    } catch (err) {
+      const e2 = err as { response?: { data?: { message?: string } }; code?: string }
+      setUploadError(
+        e2.response?.data?.message ??
+          (e2.code === 'ECONNABORTED' ? 'Upload timed out. Please try again.' : 'Upload failed. Please try again.'),
+      )
     } finally {
-      setUploading(false)
+      setBusy(false)
       if (fileRef.current) fileRef.current.value = ''
     }
   }
@@ -86,16 +117,17 @@ function DealImageField({
       <div className="flex gap-2">
         <input
           id="deal-image"
-          type="url"
+          type="text"
+          inputMode="url"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="https://..."
+          placeholder="https://... or upload from device"
           className={inputClass}
         />
         <input
           ref={fileRef}
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
           className="hidden"
           onChange={handleFile}
         />
@@ -120,12 +152,18 @@ function DealImageField({
         <p className="text-xs text-red-500">{uploadError}</p>
       )}
 
-      {value && (
+      {uploading && <p className="text-xs text-slate-500">Uploading image…</p>}
+
+      {value && !previewFailed && (
         <img
           src={value}
           alt="Deal preview"
+          onError={() => setPreviewFailed(true)}
           className="h-20 w-32 rounded-xl border border-slate-200 object-cover dark:border-slate-700"
         />
+      )}
+      {value && previewFailed && (
+        <p className="text-xs text-amber-600">Preview unavailable — check that the image URL is correct.</p>
       )}
     </div>
   )
@@ -140,6 +178,7 @@ export function FlashDealsPage() {
   const [form, setForm] = useState<DealForm>(emptyForm)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
 
   useEffect(() => {
     loadDeals()
@@ -157,17 +196,31 @@ export function FlashDealsPage() {
     }
   }
 
+  // A deal is "live" only when switched on AND inside its start/end window
+  const isLive = (d: FlashDeal) => {
+    const now = Date.now()
+    return d.is_active && new Date(d.starts_at).getTime() <= now && new Date(d.ends_at).getTime() > now
+  }
+  const isExpired = (d: FlashDeal) => new Date(d.ends_at).getTime() <= Date.now()
+  const isScheduled = (d: FlashDeal) => d.is_active && new Date(d.starts_at).getTime() > Date.now()
+  const statusOf = (d: FlashDeal): { label: string; variant: 'success' | 'default' | 'warning' } => {
+    if (isExpired(d)) return { label: 'Ended', variant: 'default' }
+    if (!d.is_active) return { label: 'Paused', variant: 'warning' }
+    if (isScheduled(d)) return { label: 'Scheduled', variant: 'warning' }
+    return { label: 'Active', variant: 'success' }
+  }
+
   const filteredDeals = deals.filter((deal) => {
     if (filter === 'All') return true
-    if (filter === 'Active') return deal.is_active
-    if (filter === 'Ended') return !deal.is_active
+    if (filter === 'Active') return isLive(deal)
+    if (filter === 'Ended') return !isLive(deal)
     return true
   })
 
   const stats = [
     {
       label: 'Active deals',
-      value: String(deals.filter((d) => d.is_active).length),
+      value: String(deals.filter(isLive).length),
       delta: '+0',
       tone: 'success',
       icon: Flame,
@@ -214,7 +267,7 @@ export function FlashDealsPage() {
     try {
       const deal = deals.find((d) => d.id === id)
       if (deal) {
-        await api.patch(`/flash-deals/${id}`, { is_active: !deal.is_active })
+        await api.patch(`/flash-deals/${id}`, { isActive: !deal.is_active, is_active: !deal.is_active })
         setDeals(
           deals.map((d) =>
             d.id === id ? { ...d, is_active: !d.is_active } : d
@@ -235,7 +288,7 @@ export function FlashDealsPage() {
   }
 
   const closeCreateDialog = () => {
-    if (submitting) return
+    if (submitting || imageUploading) return
     setShowCreateDialog(false)
   }
 
@@ -251,6 +304,8 @@ export function FlashDealsPage() {
     const discount = Number(form.discount_percent)
     const start = new Date(form.starts_at)
     const end = new Date(form.ends_at)
+
+    if (imageUploading) return setFormError('Please wait for the image to finish uploading.')
 
     const err = validate(
       required(title, 'Title'),
@@ -273,19 +328,17 @@ export function FlashDealsPage() {
       await api.post('/flash-deals', {
         title,
         description: form.description.trim() || null,
-        discount_percent: discount,
-        starts_at: start.toISOString(),
-        ends_at: end.toISOString(),
-        image_url: form.image_url.trim() || null,
-        is_active: true,
+        discountPercent: discount,
+        startsAt: start.toISOString(),
+        endsAt: end.toISOString(),
+        imageUrl: form.image_url.trim() || null,
       })
       setShowCreateDialog(false)
       await loadDeals()
     } catch (error) {
       console.error('Failed to create flash deal:', error)
-      const message = (error as { response?: { data?: { message?: string } } })?.response?.data
-        ?.message
-      setFormError(message || 'Could not create the flash deal. Please try again.')
+      const resp = (error as { response?: { data?: { message?: string } } })?.response
+      setFormError(resp?.data?.message || 'Could not create the flash deal. Please check your connection and try again.')
     } finally {
       setSubmitting(false)
     }
@@ -375,8 +428,8 @@ export function FlashDealsPage() {
                           <h3 className="font-semibold text-slate-900 dark:text-slate-100">
                             {deal.title}
                           </h3>
-                          <Badge variant={deal.is_active ? 'success' : 'default'}>
-                            {deal.is_active ? 'Active' : 'Ended'}
+                          <Badge variant={statusOf(deal).variant}>
+                            {statusOf(deal).label}
                           </Badge>
                         </div>
                         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
@@ -431,7 +484,7 @@ export function FlashDealsPage() {
 
       {/* Create Deal Dialog */}
       {showCreateDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowCreateDialog(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeCreateDialog}>
           <form
             onSubmit={handleCreate}
             onClick={(e) => e.stopPropagation()}
@@ -521,6 +574,7 @@ export function FlashDealsPage() {
                 <DealImageField
                   value={form.image_url}
                   onChange={(url) => updateForm('image_url', url)}
+                  onUploadingChange={setImageUploading}
                 />
               </div>
 
@@ -532,11 +586,11 @@ export function FlashDealsPage() {
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={closeCreateDialog} disabled={submitting}>
+              <Button type="button" variant="outline" onClick={closeCreateDialog} disabled={submitting || imageUploading}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? 'Creating...' : 'Create'}
+              <Button type="submit" disabled={submitting || imageUploading}>
+                {submitting ? 'Creating...' : imageUploading ? 'Uploading image...' : 'Create'}
               </Button>
             </div>
           </form>

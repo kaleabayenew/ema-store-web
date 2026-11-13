@@ -1391,7 +1391,7 @@ export function SupportPage() {
                       value={reply}
                       onChange={handleReplyChange}
                       onKeyDown={handleReplyKeyDown}
-                      disabled={sending || selected.status === 'CLOSED'}
+                      disabled={sending}
                       className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 disabled:opacity-50"
                     />
                     <input
@@ -1405,16 +1405,16 @@ export function SupportPage() {
                       variant="outline"
                       size="icon"
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={sending || selected.status === 'CLOSED'}
+                      disabled={sending}
                       title="Attach image"
                     >
                       {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
                     </Button>
-                    <Button size="icon" onClick={sendReply} disabled={(!reply.trim() && !imageFile) || sending || selected.status === 'CLOSED'}>
+                    <Button size="icon" onClick={sendReply} disabled={(!reply.trim() && !imageFile) || sending}>
                       {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </Button>
                   </div>
-                  {selected.status === 'CLOSED' && <p className="mt-1 text-xs text-slate-400">This ticket is closed.</p>}
+                  {selected.status === 'CLOSED' && <p className="mt-1 text-xs text-slate-400">This ticket is closed — sending a reply will reopen it.</p>}
                 </div>
               </>
             )}

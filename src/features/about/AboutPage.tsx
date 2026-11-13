@@ -49,9 +49,7 @@ function ImageField({
       form.append('file', file)
       form.append('folder', 'about')
 
-      const res = await api.post('/upload', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      const res = await api.post('/upload', form)
       onChange(res.data.url)
     } catch (err: any) {
       setUploadError(err.response?.data?.message ?? 'Upload failed')
