@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Gavel, Plus, Search, X, Package, Loader2, AlertCircle,
-  ChevronLeft, ChevronRight, Image as ImageIcon, Pencil, Trash2, Eye, Users,
+  ChevronLeft, ChevronRight, Image as ImageIcon, Pencil, Trash2, Eye, Users, Trophy, Info,
 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAlert, useConfirm } from '@/components/ui/ConfirmDialog'
-import { dateAfter, dateInFuture, isPositive, maxLength, required, validate } from '@/lib/validate'
+import { dateAfter, dateInFuture, maxLength, required, validate } from '@/lib/validate'
 import api from '@/lib/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -24,19 +24,43 @@ interface Bid {
   endsAt: string
   status: 'DRAFT' | 'ACTIVE' | 'ENDED'
   totalBidders: number
+  totalBids?: number
+  uniqueBids?: number
   lowestBid: number
   highestBid: number
   totalCollected: number
-  entries?: Bidder[]
+  winnerAmount?: number | null
+  winner?: { name: string; phone: string; amount: number; final: boolean } | null
+  entries?: BidEntry[]
+  bidders?: BidderSummary[]
 }
 
-interface Bidder {
+// One row per bid placed (a person who bids 4 times has 4 entries).
+interface BidEntry {
   id: string
+  userId?: string
   name: string
   phone: string
   amount: number
   at: string
+  duplicateCount?: number
+  isUnique?: boolean
+  isWinner?: boolean
 }
+
+// One row per person (bidder) with how many bids they placed.
+interface BidderSummary {
+  userId: string
+  name: string
+  phone: string
+  bidsCount: number
+}
+
+// ── Bid rules (must match the backend: bids.service.js) ──────────────────────
+const MIN_BID = 1.0
+const BID_STEP = 0.01
+const money = (n: number) =>
+  `ETB ${Number(n).toLocaleString('en-ET', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 interface Product {
   id: string
@@ -79,7 +103,7 @@ export function BidControlPage() {
   const [form, setForm] = useState({
     title: '', productId: '', productName: '',
     productImage: '' as string | null,
-    startPrice: '', minIncrement: '10', startsAt: '', endsAt: '',
+    startPrice: MIN_BID.toFixed(2), minIncrement: BID_STEP.toFixed(2), startsAt: '', endsAt: '',
   })
   const [formError, setFormError]               = useState<string | null>(null)
   const [showProductPicker, setShowProductPicker] = useState(false)
@@ -115,7 +139,7 @@ export function BidControlPage() {
     setEditingId(null)
     setForm({
       title: '', productId: '', productName: '', productImage: null,
-      startPrice: '', minIncrement: '10',
+      startPrice: MIN_BID.toFixed(2), minIncrement: BID_STEP.toFixed(2),
       startsAt: toLocalInput(now), endsAt: toLocalInput(tomorrow),
     })
     setFormError(null)
@@ -129,8 +153,8 @@ export function BidControlPage() {
       productId: bid.productId,
       productName: bid.productName,
       productImage: bid.productImage,
-      startPrice: String(bid.startPrice),
-      minIncrement: String(bid.minIncrement),
+      startPrice: MIN_BID.toFixed(2),
+      minIncrement: BID_STEP.toFixed(2),
       startsAt: toLocalInput(new Date(bid.startsAt)),
       endsAt: toLocalInput(new Date(bid.endsAt)),
     })
@@ -149,7 +173,6 @@ export function BidControlPage() {
       productId: p.id,
       productName: p.nameEn,
       productImage: p.primaryImageUrl,
-      startPrice: f.startPrice || (p.priceCents / 100).toString(),
     }))
     setShowProductPicker(false)
   }
@@ -157,8 +180,6 @@ export function BidControlPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const title        = form.title.trim()
-    const startPrice   = Number(form.startPrice)
-    const minIncrement = Number(form.minIncrement)
     const start        = new Date(form.startsAt)
     const end          = new Date(form.endsAt)
 
@@ -166,8 +187,6 @@ export function BidControlPage() {
       required(title, 'Title'),
       maxLength(title, 100, 'Title'),
       form.productId ? null : 'Please select a product.',
-      isPositive(startPrice, 'Starting price'),
-      isPositive(minIncrement, 'Min increment'),
       Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) ? 'Choose valid start and end times.' : null,
       dateAfter(form.endsAt, form.startsAt, 'End time', 'start time'),
       dateInFuture(form.endsAt, 'End time'),
@@ -180,8 +199,9 @@ export function BidControlPage() {
       const payload = {
         title,
         productId:    form.productId,
-        startPrice,
-        minIncrement,
+        // The rules are fixed on the server (start 1.00, step 0.01); sent for clarity.
+        startPrice:   MIN_BID,
+        minIncrement: BID_STEP,
         startsAt:     start.toISOString(),
         endsAt:       end.toISOString(),
       }
@@ -202,7 +222,7 @@ export function BidControlPage() {
   async function handleDelete(id: string) {
     const ok = await confirmDialog({
       title: 'Delete this bid?',
-      message: 'The bid and all its entries will be permanently removed.',
+      message: 'The bid and all its entries will be permanently removed. Money held for its bids is returned to the bidders.',
       confirmText: 'Delete',
       variant: 'danger',
     })
@@ -249,6 +269,9 @@ export function BidControlPage() {
         </div>
       </div>
 
+      {/* Rules */}
+      <BidRules />
+
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
         {[
@@ -284,7 +307,7 @@ export function BidControlPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left dark:border-slate-800">
-                  {['Bid', 'Start price', 'Min increment', 'Ends', 'Status', 'Actions'].map((h) => (
+                  {['Bid', 'Bidders', 'Bids', 'Lowest unique', 'Ends', 'Status', 'Actions'].map((h) => (
                     <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{h}</th>
                   ))}
                 </tr>
@@ -292,7 +315,7 @@ export function BidControlPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {bids.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
                       <Gavel className="mx-auto mb-2 h-8 w-8" />
                       No bids yet. Click "Add Bid" to create one.
                     </td>
@@ -314,8 +337,11 @@ export function BidControlPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-brand-700 dark:text-brand-300">ETB {b.startPrice.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">ETB {b.minIncrement.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{b.totalBidders ?? 0}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{b.totalBids ?? 0}</td>
+                    <td className="px-4 py-3 font-semibold text-emerald-600 dark:text-emerald-400">
+                      {b.winnerAmount != null ? money(b.winnerAmount) : '—'}
+                    </td>
                     <td className="px-4 py-3 text-xs text-slate-500">{new Date(b.endsAt).toLocaleString()}</td>
                     <td className="px-4 py-3">
                       <Badge variant={b.status === 'ACTIVE' ? 'success' : b.status === 'DRAFT' ? 'warning' : 'default'}>
@@ -380,14 +406,18 @@ export function BidControlPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Starting price (ETB)</label>
-                  <input type="number" min={1} step="0.01" className={inputClass} value={form.startPrice} onChange={(e) => updateForm('startPrice', e.target.value)} placeholder="0.00" />
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Starting bid (ETB)</label>
+                  <input type="number" className={`${inputClass} cursor-not-allowed opacity-70`} value={form.startPrice} readOnly disabled />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Min increment (ETB)</label>
-                  <input type="number" min={1} step="0.01" className={inputClass} value={form.minIncrement} onChange={(e) => updateForm('minIncrement', e.target.value)} placeholder="10" />
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Bid step (ETB)</label>
+                  <input type="number" className={`${inputClass} cursor-not-allowed opacity-70`} value={form.minIncrement} readOnly disabled />
                 </div>
               </div>
+
+              <p className="-mt-2 text-xs text-slate-400">
+                Fixed rules: every auction starts at {money(MIN_BID)} and goes up in steps of {BID_STEP.toFixed(2)}.
+              </p>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -429,11 +459,16 @@ export function BidControlPage() {
 // ── Bid Detail ────────────────────────────────────────────────────────────────
 
 function BidDetail({ bid, loading, onClose }: { bid: Bid; loading: boolean; onClose: () => void }) {
-  const bidders       = (bid.entries ?? []).slice().sort((a, b) => b.amount - a.amount)
-  const totalBidders  = bid.totalBidders
-  const lowestBid     = bid.lowestBid
-  const totalCollected = bid.totalCollected
-  const initialCost   = bid.startPrice
+  // Lowest amount first; for the same amount the earliest bid first.
+  const entries = (bid.entries ?? []).slice().sort(
+    (a, b) => a.amount - b.amount || new Date(a.at).getTime() - new Date(b.at).getTime(),
+  )
+  const totalBids     = entries.length > 0 ? entries.length : (bid.totalBids ?? 0)
+  const totalBidders  = bid.bidders ? bid.bidders.length : bid.totalBidders
+  const uniqueBids    = entries.length > 0 ? entries.filter((e) => e.isUnique).length : (bid.uniqueBids ?? 0)
+  const lowestUnique  = bid.winner?.amount ?? bid.winnerAmount ?? null
+  const totalCollected = bid.totalCollected ?? 0
+  const ended         = bid.status === 'ENDED'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
@@ -465,13 +500,43 @@ function BidDetail({ bid, loading, onClose }: { bid: Bid; loading: boolean; onCl
             </div>
           </div>
 
+          {/* Winner */}
+          <div className={`flex items-center gap-3 rounded-xl p-3 ring-1 ${
+            bid.winner
+              ? 'bg-emerald-50 ring-emerald-200 dark:bg-emerald-900/20 dark:ring-emerald-900'
+              : 'bg-slate-50 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700'
+          }`}>
+            <Trophy className={`h-6 w-6 flex-shrink-0 ${bid.winner ? 'text-emerald-600' : 'text-slate-400'}`} />
+            <div className="min-w-0">
+              {bid.winner ? (
+                <>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                    {ended ? 'Winner' : 'Leading right now (not final)'}
+                  </p>
+                  <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
+                    {bid.winner.name} · {bid.winner.phone} · {money(bid.winner.amount)}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  {entries.length === 0
+                    ? 'No bids placed yet.'
+                    : ended
+                      ? 'No winner: every bid amount was placed more than once.'
+                      : 'No unique bid yet: every amount so far was placed more than once.'}
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Stat tiles */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {[
-              { label: 'Material initial cost', value: `ETB ${initialCost.toLocaleString()}` },
-              { label: 'Total collected',        value: `ETB ${totalCollected.toLocaleString()}`, highlight: true },
-              { label: 'Total bidders',           value: String(totalBidders), useIcon: true },
-              { label: 'Lowest bid',              value: lowestBid > 0 ? `ETB ${lowestBid.toLocaleString()}` : '—' },
+              { label: 'Starting bid',      value: money(MIN_BID) },
+              { label: 'Bidders (people)',  value: String(totalBidders), useIcon: true },
+              { label: 'Bids (all entries)', value: String(totalBids),   useIcon: true },
+              { label: 'Unique bids',       value: String(uniqueBids) },
+              { label: 'Lowest unique bid', value: lowestUnique != null ? money(lowestUnique) : '—', highlight: true },
             ].map(({ label, value, highlight, useIcon }) => (
               <div key={label} className={`rounded-xl p-3 ${highlight ? 'bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-900/20 dark:ring-emerald-900' : 'bg-slate-50 dark:bg-slate-800'}`}>
                 <p className="flex items-center gap-1 text-xs text-slate-400">
@@ -481,6 +546,7 @@ function BidDetail({ bid, loading, onClose }: { bid: Bid; loading: boolean; onCl
               </div>
             ))}
           </div>
+          <p className="-mt-2 text-xs text-slate-400">Total collected from bids: {money(totalCollected)}</p>
 
           {/* Schedule */}
           <div className="grid grid-cols-2 gap-3">
@@ -494,36 +560,72 @@ function BidDetail({ bid, loading, onClose }: { bid: Bid; loading: boolean; onCl
             </div>
           </div>
 
-          {/* Bidders table */}
+          {/* Bidders (people) */}
+          {bid.bidders && bid.bidders.length > 0 && (
+            <div>
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                <Users className="h-4 w-4 text-brand-600" /> Bidders ({bid.bidders.length})
+              </h3>
+              <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 text-left dark:bg-slate-800">
+                      {['Bidder', 'Phone', 'Bids'].map((h) => (
+                        <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {bid.bidders.map((p) => (
+                      <tr key={p.userId}>
+                        <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-100">{p.name}</td>
+                        <td className="px-3 py-2 text-slate-500">{p.phone}</td>
+                        <td className="px-3 py-2 font-semibold text-slate-700 dark:text-slate-200">{p.bidsCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Bids (every entry) */}
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                <Users className="h-4 w-4 text-brand-600" /> Bidders ({totalBidders})
+                <Gavel className="h-4 w-4 text-brand-600" /> Bids ({totalBids}) · lowest first
               </h3>
               {loading && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
             </div>
-            {bidders.length === 0 ? (
+            {entries.length === 0 ? (
               <p className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-400 dark:bg-slate-800">
-                {loading ? 'Loading bidders…' : 'No bids placed yet.'}
+                {loading ? 'Loading bids…' : 'No bids placed yet.'}
               </p>
             ) : (
               <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 text-left dark:bg-slate-800">
-                      {['#', 'Bidder', 'Phone', 'Amount', 'Time'].map((h) => (
+                      {['#', 'Bidder', 'Phone', 'Amount', 'Result', 'Time'].map((h) => (
                         <th key={h} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {bidders.map((b, i) => (
-                      <tr key={b.id} className={i === 0 ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}>
+                    {entries.map((b, i) => (
+                      <tr key={b.id} className={b.isWinner ? 'bg-emerald-50/60 dark:bg-emerald-900/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}>
                         <td className="px-3 py-2 text-xs font-bold text-slate-400">{i + 1}</td>
                         <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-100">{b.name}</td>
                         <td className="px-3 py-2 text-slate-500">{b.phone}</td>
-                        <td className={`px-3 py-2 font-semibold ${i === 0 ? 'text-emerald-600' : 'text-brand-700 dark:text-brand-300'}`}>
-                          ETB {b.amount.toLocaleString()}
+                        <td className={`px-3 py-2 font-semibold ${b.isWinner ? 'text-emerald-600' : b.isUnique ? 'text-brand-700 dark:text-brand-300' : 'text-slate-400 line-through'}`}>
+                          {money(b.amount)}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {b.isWinner
+                            ? <Badge variant="success">{ended ? 'Winner' : 'Leading'}</Badge>
+                            : b.isUnique
+                              ? <span className="text-slate-500">Unique</span>
+                              : <span className="text-amber-600">Same amount ×{b.duplicateCount ?? 2}</span>}
                         </td>
                         <td className="px-3 py-2 text-xs text-slate-500">{new Date(b.at).toLocaleString()}</td>
                       </tr>
@@ -535,6 +637,24 @@ function BidDetail({ bid, loading, onClose }: { bid: Bid; loading: boolean; onCl
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Rules ─────────────────────────────────────────────────────────────────────
+
+function BidRules() {
+  return (
+    <div className="rounded-2xl border border-brand-200 bg-brand-50/60 p-4 dark:border-brand-900 dark:bg-brand-950/20">
+      <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <Info className="h-4 w-4 text-brand-600" /> Bid rules
+      </h2>
+      <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-300">
+        <li>Every bid starts at <b>{money(MIN_BID)}</b> and goes up in steps of <b>{BID_STEP.toFixed(2)}</b> (1.00, 1.01, 1.02…).</li>
+        <li><b>Bidder</b> = the person. <b>Bid</b> = every single bid placed. One person who bids 4 times is 1 bidder and 4 bids.</li>
+        <li>When the countdown ends, the <b>winner is the lowest unique bid</b>: the smallest amount that only one bid placed.</li>
+        <li>Bids with the same amount do not win, even when that amount is the lowest.</li>
+      </ul>
     </div>
   )
 }
