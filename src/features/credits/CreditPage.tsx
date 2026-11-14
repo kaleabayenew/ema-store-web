@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Coins, Search, Wallet, ChevronLeft, ChevronRight, RefreshCw, History, X, ArrowDownToLine, ArrowUpFromLine, Package, Save, Power } from 'lucide-react'
+import { Coins, Search, ChevronLeft, ChevronRight, RefreshCw, History, X, ArrowDownToLine, ArrowUpFromLine, Package, Save, Power, Gift } from 'lucide-react'
 
 import { useAlert } from '@/components/ui/ConfirmDialog'
 import { ROLE_LABELS } from '@/config/rbac'
@@ -115,9 +115,7 @@ export function CreditPage() {
   const [coinPriceDrafts, setCoinPriceDrafts] = useState<Record<string, string>>({})
   const [coinPriceSaving, setCoinPriceSaving] = useState<string | null>(null)
   const [coinBuyEnabled, setCoinBuyEnabled] = useState(false)
-  const [coinMarked, setCoinMarked] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('coinProductIds') ?? '[]')) } catch { return new Set() }
-  })
+  const [coinMarked, setCoinMarked] = useState<Set<string>>(new Set())
   const [coinProducts, setCoinProducts] = useState<any[]>([])
   const [coinProductsTotal, setCoinProductsTotal] = useState(0)
   const [coinProductPage, setCoinProductPage] = useState(1)
@@ -125,6 +123,7 @@ export function CreditPage() {
   const [coinProductDebounced, setCoinProductDebounced] = useState('')
   const [coinProductFilter, setCoinProductFilter] = useState('All')
   const [coinProductsLoading, setCoinProductsLoading] = useState(false)
+  const [coinTab, setCoinTab] = useState<'buy' | 'gift' | 'rate'>('rate')
   const [view, setView] = useState<'users' | 'transactions'>('users')
   const [currency, setCurrency] = useState<CreditCurrency>('balance')
   const [direction, setDirection] = useState<CreditDirection>('all')
@@ -243,6 +242,7 @@ export function CreditPage() {
         setCoinRateDraft(String(r.coinsPerUnit))
         setInviteGiftDraft(String(r.inviteGiftCoins))
         setCoinBuyEnabled(r.coinBuyEnabled)
+        setCoinMarked(new Set(r.coinProductIds ?? []))
       })
       .catch(() => setCoinRate(null))
       .finally(() => setCoinRateLoading(false))
@@ -338,7 +338,7 @@ export function CreditPage() {
       const updated = await updateCoinSettings({ coinBuyEnabled: next })
       setCoinRate(updated)
       setCoinBuyEnabled(updated.coinBuyEnabled)
-      localStorage.setItem('coinBuyEnabled', String(updated.coinBuyEnabled))
+      setCoinMarked(new Set(updated.coinProductIds ?? []))
       alert({ variant: 'success', message: next ? 'Coin purchases enabled.' : 'Coin purchases disabled.' })
     } catch (e: any) {
       alert({ variant: 'error', message: e.response?.data?.message ?? 'Failed to update' })
@@ -363,19 +363,22 @@ export function CreditPage() {
     } finally { setCoinPriceSaving(null) }
   }
 
-  const toggleCoinProduct = (id: string) => {
-    setCoinMarked((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      localStorage.setItem('coinProductIds', JSON.stringify([...next]))
-      return next
-    })
+  const toggleCoinProduct = async (id: string) => {
+    const next = new Set(coinMarked)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    const ids = [...next]
+    setCoinMarked(next)
+    try {
+      const updated = await updateCoinSettings({ coinProductIds: ids })
+      setCoinMarked(new Set(updated.coinProductIds ?? ids))
+    } catch (e: any) {
+      setCoinMarked(coinMarked)
+      alert({ variant: 'error', message: e.response?.data?.message ?? 'Failed to save coin products' })
+    }
   }
 
   const txTotalPages = Math.max(1, Math.ceil(txTotal / PAGE_SIZE))
   const userTotalPages = Math.max(1, Math.ceil(usersTotal / PAGE_SIZE))
-  const coinTotal = summary?.totalCoins ?? 0
-  const balanceTotal = summary?.totalBalance ?? 0
 
   const showUserHistory = (u: CreditUser) => {
     setSelectedUser(u)
@@ -486,7 +489,7 @@ export function CreditPage() {
           )}
           <Button
             variant="outline"
-            onClick={() => { loadSummary(); view === 'users' ? loadUsers() : loadTransactions() }}
+            onClick={() => { loadSummary(); if (view === 'users') { loadUsers() } else { loadTransactions() } }}
             disabled={loading}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -494,6 +497,32 @@ export function CreditPage() {
           </Button>
         </div>
       </div>
+
+      {/* Platform-wide totals */}
+      {summary && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center gap-x-10 gap-y-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Total balance</p>
+              <p className="mt-1 text-xl font-semibold text-emerald-600 dark:text-emerald-400">{formatMoney(summary.totalBalance)}</p>
+            </div>
+            {showCoin && (
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Total coins</p>
+                <p className="mt-1 text-xl font-semibold text-amber-600 dark:text-amber-400">{summary.totalCoins.toLocaleString()}</p>
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {Object.entries(summary.byRole ?? {}).map(([role, r]) => (
+                <Badge key={role} variant="info">
+                  {ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role}: {formatMoney(r.balance)}
+                  {showCoin ? ` · ${r.coins.toLocaleString()} coins` : ''}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Super-admin "Stuff" panel: staff who can access the Credits page,
           with balance and deposit/withdraw/transaction actions. */}
@@ -579,15 +608,41 @@ export function CreditPage() {
         </div>
       )}
 
-      {/* Coin panel: conversion setup + coin-purchase product picker. */}
+      {/* Coin panel: tabbed setup — buy products, invite gift, conversion rate. */}
       {showCoin && (
-        <div className="space-y-4">
-          {/* Conversion setup */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          {/* Tabs */}
+          <div className="mb-4 flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+            {([
+              { key: 'buy',  label: 'Coin can buy product', icon: Package },
+              { key: 'gift', label: 'Invite gift',          icon: Gift },
+              { key: 'rate', label: 'Coins per 1 ETB',      icon: Coins },
+            ] as const).map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setCoinTab(key)}
+                className={`flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition ${
+                  coinTab === key
+                    ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {coinTab === 'rate' && (
+          <div>
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                Conversion setup
-              </h3>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Coins per 1 ETB
+                </h3>
+                <p className="text-xs text-slate-400">Coin ⇄ balance conversion rate</p>
+              </div>
               {coinRate && (
                 <Button
                   variant={coinRate.conversionEnabled === false ? 'outline' : 'default'}
@@ -649,9 +704,10 @@ export function CreditPage() {
               <p className="py-6 text-center text-sm text-slate-400">Conversion rate unavailable.</p>
             )}
           </div>
+          )}
 
-          {/* Invite gift */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          {coinTab === 'gift' && (
+          <div>
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -697,9 +753,10 @@ export function CreditPage() {
               <p className="mt-2 text-xs text-red-500">Invite rewards are OFF — referrals earn no coins.</p>
             )}
           </div>
+          )}
 
-          {/* Coin can buy product — web-side setup for now */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          {coinTab === 'buy' && (
+          <div>
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -808,6 +865,7 @@ export function CreditPage() {
               </div>
             )}
           </div>
+          )}
         </div>
       )}
 

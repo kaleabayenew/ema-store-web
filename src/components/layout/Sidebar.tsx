@@ -1,7 +1,7 @@
 import { LogOut } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 
-import { canAccessRoute, ROLE_COLORS, ROLE_LABELS } from '@/config/rbac'
+import { canAccessPage, ROLE_COLORS, ROLE_LABELS } from '@/config/rbac'
 import { navGroups } from '@/config/navigation'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
@@ -12,22 +12,14 @@ interface SidebarProps { isCollapsed: boolean; onToggle: () => void }
 export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
-  const role = (user?.role ?? 'SUPER_ADMIN') as Role
-  const allowedPages = user?.allowedPages ?? []
+  // Never fall back to SUPER_ADMIN — an unknown role sees nothing.
+  const role = user?.role as Role | undefined
 
   const visibleGroups = navGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => {
-        // Super Admin sees all pages
-        if (role === 'SUPER_ADMIN' || role === 'ADMIN') return true
-        // Other roles see pages based on allowedPages
-        if (allowedPages.length > 0) {
-          return allowedPages.includes(item.href)
-        }
-        // Fallback to role-based access
-        return canAccessRoute(role, item.href)
-      }),
+      // Same rule the route guard uses — sidebar and guard can't disagree.
+      items: group.items.filter((item) => canAccessPage(user, item.href)),
     }))
     .filter((group) => group.items.length > 0)
 
@@ -36,21 +28,25 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'flex flex-col border-r border-slate-200 bg-white/90 backdrop-blur-sm transition-all duration-200 dark:border-slate-800 dark:bg-slate-950/90',
+        'relative flex h-full shrink-0 flex-col border-r border-slate-200 bg-white/90 backdrop-blur-sm transition-all duration-200 dark:border-slate-800 dark:bg-slate-950/90',
         isCollapsed ? 'w-20' : 'w-72',
       )}
     >
       {/* ── Logo ── */}
       <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-4 dark:border-slate-800">
         <div className={cn('flex items-center gap-3', isCollapsed && 'justify-center w-full')}>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-sm font-bold text-white shadow-lg shadow-brand-600/20">
-            E
-          </div>
-          {!isCollapsed && (
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Ema</p>
-              <h1 className="text-[15px] font-semibold leading-tight">Store Admin</h1>
-            </div>
+          {isCollapsed ? (
+            <img
+              src="/image/logo_icon.svg"
+              alt="Ema Store"
+              className="h-9 w-9 shrink-0 rounded-xl"
+            />
+          ) : (
+            <img
+              src="/image/logo_full.svg"
+              alt="Ema Store Admin"
+              className="h-10 w-auto shrink-0"
+            />
           )}
         </div>
 
@@ -139,8 +135,8 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{user?.name ?? 'Admin'}</p>
-              <span className={cn('inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold', ROLE_COLORS[role])}>
-                {ROLE_LABELS[role]}
+              <span className={cn('inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold', role ? ROLE_COLORS[role] : 'bg-slate-100 text-slate-600')}>
+                {role ? ROLE_LABELS[role] : 'User'}
               </span>
             </div>
             <button

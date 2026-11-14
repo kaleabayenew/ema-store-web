@@ -13,8 +13,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useAlert } from '@/components/ui/ConfirmDialog'
+import { useAlert, useConfirm } from '@/components/ui/ConfirmDialog'
 import api from '@/lib/api'
+import { useAuthStore } from '@/store/authStore'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,8 @@ interface OrderItem {
 
 interface OrderDetail extends Order {
   customerEmail: string
+  deliveryMethod?: string | null
+  paymentId?: string | null
   items: OrderItem[]
 }
 
@@ -69,6 +72,20 @@ const STATUS_LABEL: Record<string, string> = {
 
 const ALL_STATUSES = ['PLACED', 'CONFIRMED', 'PROCESSING', 'PACKED', 'SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED', 'REFUNDED']
 
+// Allowed forward transitions — terminal states cannot be changed.
+const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+  PLACED:      ['CONFIRMED', 'CANCELLED'],
+  PENDING:     ['CONFIRMED', 'CANCELLED'],
+  CONFIRMED:   ['PROCESSING', 'PACKED', 'CANCELLED'],
+  PROCESSING:  ['PACKED', 'CANCELLED'],
+  PACKED:      ['SHIPPED', 'CANCELLED'],
+  SHIPPED:     ['IN_TRANSIT', 'DELIVERED'],
+  IN_TRANSIT:  ['DELIVERED'],
+  DELIVERED:   [],
+  CANCELLED:   [],
+  REFUNDED:    [],
+}
+
 function formatCurrency(amount: number) {
   return `ETB ${amount.toLocaleString('en-ET', { minimumFractionDigits: 2 })}`
 }
@@ -85,11 +102,15 @@ function shortId(id: string) {
 
 export function OrdersPage() {
   const alert = useAlert()
+  const confirmDialog = useConfirm()
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN'
   const [orders, setOrders] = useState<Order[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filter, setFilter] = useState<FilterStatus>('All')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -111,7 +132,7 @@ export function OrdersPage() {
     try {
       const res = await api.get('/orders/admin', {
         params: {
-          search,
+          search: debouncedSearch,
           status: filter === 'All' ? undefined : filter,
           page,
           limit: PAGE_SIZE,
@@ -132,14 +153,17 @@ export function OrdersPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, filter, page])
+  }, [debouncedSearch, filter, page])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
+  // Debounce search → single fetch after typing stops, page reset batched.
   useEffect(() => {
-    const t = setTimeout(() => { if (page !== 1) setPage(1); else fetchOrders() }, search ? 400 : 0)
+    const t = setTimeout(() => {
+      setPage(1)
+      setDebouncedSearch(search)
+    }, 400)
     return () => clearTimeout(t)
-    // eslint-disable-next-line
   }, [search])
 
   useEffect(() => { setPage(1) }, [filter])
@@ -158,6 +182,22 @@ export function OrdersPage() {
   }
 
   async function changeStatus(orderId: string, status: string) {
+    const current = detail?.id === orderId ? detail.status : orders.find((o) => o.id === orderId)?.status
+    const allowed = current ? (ALLOWED_TRANSITIONS[current] ?? []) : []
+    if (current && !allowed.includes(status)) {
+      alert({
+        variant: 'error',
+        message: `Cannot change status from ${STATUS_LABEL[current] ?? current} to ${STATUS_LABEL[status] ?? status}.`,
+      })
+      return
+    }
+    const ok = await confirmDialog({
+      title: 'Update order status',
+      message: `Change order ${shortId(orderId)} to "${STATUS_LABEL[status] ?? status}"?`,
+      confirmText: 'Update',
+      variant: status === 'CANCELLED' || status === 'REFUNDED' ? 'danger' : 'default',
+    })
+    if (!ok) return
     setUpdatingStatus(true)
     try {
       await api.patch(`/orders/admin/${orderId}/status`, { status })
@@ -305,14 +345,18 @@ export function OrdersPage() {
                         <DropdownMenuItem onClick={() => openDetail(o)}>
                           <Eye className="mr-2 h-4 w-4" />View details
                         </DropdownMenuItem>
-                        <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
-                        <div className="px-2 py-1.5 text-xs font-semibold text-slate-400">Change status</div>
-                        {ALL_STATUSES.filter((s) => s !== o.status).map((s) => (
-                          <DropdownMenuItem key={s} onClick={() => changeStatus(o.id, s)}>
-                            <span className={`mr-2 h-2 w-2 rounded-full inline-block ${STATUS_VARIANT[s] === 'success' ? 'bg-emerald-500' : STATUS_VARIANT[s] === 'danger' ? 'bg-red-500' : STATUS_VARIANT[s] === 'info' ? 'bg-blue-500' : 'bg-amber-400'}`} />
-                            {STATUS_LABEL[s] ?? s}
-                          </DropdownMenuItem>
-                        ))}
+                        {isAdmin && (
+                          <>
+                            <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+                            <div className="px-2 py-1.5 text-xs font-semibold text-slate-400">Change status</div>
+                            {(ALLOWED_TRANSITIONS[o.status] ?? []).map((s) => (
+                              <DropdownMenuItem key={s} onClick={() => changeStatus(o.id, s)}>
+                                <span className={`mr-2 h-2 w-2 rounded-full inline-block ${STATUS_VARIANT[s] === 'success' ? 'bg-emerald-500' : STATUS_VARIANT[s] === 'danger' ? 'bg-red-500' : STATUS_VARIANT[s] === 'info' ? 'bg-blue-500' : 'bg-amber-400'}`} />
+                                {STATUS_LABEL[s] ?? s}
+                              </DropdownMenuItem>
+                            ))}
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -367,6 +411,8 @@ export function OrdersPage() {
                   { label: 'Phone', value: detail.customerPhone || '—' },
                   { label: 'Email', value: detail.customerEmail || '—' },
                   { label: 'Payment', value: detail.paymentMethod },
+                  { label: 'Payment ID', value: detail.paymentId || '—' },
+                  { label: 'Delivery method', value: detail.deliveryMethod || '—' },
                   { label: 'Order total', value: formatCurrency(detail.totalAmount), highlight: true },
                   { label: 'Date', value: formatDate(detail.createdAt) },
                   { label: 'Shipping', value: detail.shippingAddress },
@@ -378,11 +424,14 @@ export function OrdersPage() {
                 ))}
               </div>
 
-              {/* Update status */}
+              {/* Update status — admins only */}
+              {isAdmin && (
               <div>
                 <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Update status</p>
                 <div className="flex flex-wrap gap-2">
-                  {ALL_STATUSES.map((s) => (
+                  {ALL_STATUSES.filter(
+                    (s) => s === detail.status || (ALLOWED_TRANSITIONS[detail.status] ?? []).includes(s),
+                  ).map((s) => (
                     <button
                       key={s}
                       disabled={updatingStatus || s === detail.status}
@@ -398,6 +447,7 @@ export function OrdersPage() {
                   {updatingStatus && <Loader2 className="h-4 w-4 animate-spin text-brand-600 self-center" />}
                 </div>
               </div>
+              )}
 
               {/* Items */}
               <div>

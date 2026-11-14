@@ -181,6 +181,7 @@ export interface CoinSettings {
   inviteGiftEnabled: boolean
   inviteGiftCoins: number
   coinBuyEnabled: boolean
+  coinProductIds: string[]
   updatedAt: string | null
 }
 
@@ -195,6 +196,7 @@ export async function updateCoinSettings(payload: {
   inviteGiftEnabled?: boolean
   inviteGiftCoins?: number
   coinBuyEnabled?: boolean
+  coinProductIds?: string[]
 }): Promise<CoinSettings> {
   const { data } = await api.put<CoinSettings>('/admin/credits/coin-settings', payload)
   return data

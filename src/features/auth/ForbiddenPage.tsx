@@ -7,6 +7,7 @@ export function ForbiddenPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10 dark:bg-slate-950">
       <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-soft dark:border-slate-800 dark:bg-slate-900">
+        <img src="/image/logo_icon.svg" alt="Ema Store" className="mx-auto mb-5 h-12 w-12 rounded-xl" />
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-300">
           <ShieldAlert className="h-8 w-8" />
         </div>

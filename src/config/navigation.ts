@@ -1,6 +1,6 @@
 import {
   BarChart3, Bell, Bike, Boxes, Building2, CreditCard, FileText, Flame, Gavel,
-  Image, Info, LayoutDashboard, MessageSquareText, PackageCheck, Plug,
+  Image, Inbox, Info, LayoutDashboard, Megaphone, MessageSquareText, PackageCheck, Plug, Star,
   Settings, ShoppingCart, Sparkles, UserRoundCog, Users, Wallet, Warehouse,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -27,11 +27,14 @@ export const navGroups: { title: string; items: NavItem[] }[] = [
       { title: 'Flash Deals', href: '/flash-deals', icon: Flame },
       { title: 'Bid Control', href: '/bids',        icon: Gavel },
       { title: 'Support',    href: '/support',   icon: MessageSquareText },
+      { title: 'Reviews',    href: '/reviews',   icon: Star },
+      { title: 'Feedback',   href: '/feedback',  icon: Inbox },
       { title: 'Delivery',   href: '/delivery',  icon: Warehouse },
       { title: 'Finance',    href: '/finance',   icon: CreditCard },
       { title: 'Credits',    href: '/credits',   icon: Wallet },
       { title: 'Approvals',  href: '/approvals', icon: PackageCheck },
       { title: 'Banners',    href: '/banners',   icon: Image },
+      { title: 'Announcements', href: '/announcements', icon: Megaphone },
       { title: 'About',      href: '/about',     icon: Info },
     ],
   },

@@ -83,6 +83,19 @@ const toLocalInput = (d: Date) => {
 const formatPrice = (cents: number) =>
   `ETB ${(cents / 100).toLocaleString('en-ET', { minimumFractionDigits: 2 })}`
 
+// Live countdown — re-rendered every second via the `now` ticker in the page.
+function formatCountdown(endsAt: string, now: number): string {
+  const diff = new Date(endsAt).getTime() - now
+  if (diff <= 0) return 'Ended'
+  const s = Math.floor(diff / 1000)
+  const d = Math.floor(s / 86400)
+  const h = Math.floor((s % 86400) / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  if (d > 0) return `${d}d ${h}h ${m}m`
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+}
+
 const inputClass =
   'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100'
 
@@ -95,6 +108,7 @@ export function BidControlPage() {
   const [total, setTotal]     = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
+  const [now, setNow]         = useState(() => Date.now())
 
   // form state
   const [showForm, setShowForm]     = useState(false)
@@ -130,6 +144,12 @@ export function BidControlPage() {
   }, [])
 
   useEffect(() => { fetchBids() }, [fetchBids])
+
+  // Tick every second so the countdown column stays live.
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
 
   // ── Form helpers ─────────────────────────────────────────────────────────────
 
@@ -307,7 +327,7 @@ export function BidControlPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left dark:border-slate-800">
-                  {['Bid', 'Bidders', 'Bids', 'Lowest unique', 'Ends', 'Status', 'Actions'].map((h) => (
+                  {['Bid', 'Bidders', 'Bids', 'Lowest unique', 'Ends', 'Time left', 'Status', 'Actions'].map((h) => (
                     <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{h}</th>
                   ))}
                 </tr>
@@ -315,7 +335,7 @@ export function BidControlPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {bids.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
                       <Gavel className="mx-auto mb-2 h-8 w-8" />
                       No bids yet. Click "Add Bid" to create one.
                     </td>
@@ -334,6 +354,7 @@ export function BidControlPage() {
                         <div className="min-w-0">
                           <p className="truncate max-w-[200px] font-medium text-slate-900 dark:text-slate-100">{b.title}</p>
                           <p className="truncate max-w-[200px] text-xs text-slate-400">{b.productName}</p>
+                          <p className="font-mono text-[10px] uppercase tracking-wide text-slate-400">ID: {b.id.slice(0, 8)}</p>
                         </div>
                       </div>
                     </td>
@@ -343,6 +364,23 @@ export function BidControlPage() {
                       {b.winnerAmount != null ? money(b.winnerAmount) : '—'}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500">{new Date(b.endsAt).toLocaleString()}</td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const remaining = new Date(b.endsAt).getTime() - now
+                        const urgent = remaining > 0 && remaining < 60 * 60 * 1000
+                        return (
+                          <span className={`font-mono text-xs font-semibold tabular-nums ${
+                            remaining <= 0
+                              ? 'text-slate-400'
+                              : urgent
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-slate-700 dark:text-slate-200'
+                          }`}>
+                            {formatCountdown(b.endsAt, now)}
+                          </span>
+                        )
+                      })()}
+                    </td>
                     <td className="px-4 py-3">
                       <Badge variant={b.status === 'ACTIVE' ? 'success' : b.status === 'DRAFT' ? 'warning' : 'default'}>
                         {b.status}

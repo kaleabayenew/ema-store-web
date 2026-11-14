@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Boxes, Package, Star, Search, Pencil, Trash2, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Boxes, Package, Star, Search, Pencil, Trash2, Loader2, AlertCircle, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAlert } from '@/components/ui/ConfirmDialog'
 import { ProductForm } from './ProductForm'
 import api from '@/lib/api'
+import { apiErrorMessage } from '@/lib/errors'
+import { useAuthStore } from '@/store/authStore'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -51,12 +53,15 @@ const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'default'
 
 export function ProductsPage() {
   const alert = useAlert()
+  const { user } = useAuthStore()
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const [products, setProducts]     = useState<Product[]>([])
   const [total, setTotal]           = useState(0)
   const [page, setPage]             = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [categories, setCategories] = useState<Array<{ id: string; name_en: string }>>([])
   const [search, setSearch]         = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filter, setFilter]         = useState<FilterStatus>('All')
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState<string | null>(null)
@@ -67,6 +72,7 @@ export function ProductsPage() {
   const [showEditDialog, setShowEditDialog]     = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [selectedProduct, setSelectedProduct]  = useState<Product | null>(null)
+  const [viewingProduct, setViewingProduct]    = useState<Product | null>(null)
   const [deleting, setDeleting]                 = useState(false)
 
   const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0, avgRating: 0 })
@@ -78,7 +84,7 @@ export function ProductsPage() {
     setError(null)
     try {
       const response = await api.get('/products', {
-        params: { search, status: filter === 'All' ? undefined : filter, page, limit: PAGE_SIZE },
+        params: { search: debouncedSearch, status: filter === 'All' ? undefined : filter, page, limit: PAGE_SIZE },
       })
       const data = (response.data.products ?? []) as Product[]
       setProducts(data)
@@ -104,7 +110,7 @@ export function ProductsPage() {
       const response = await api.get('/products/categories')
       setCategories((response.data.categories ?? []) as Array<{ id: string; name_en: string }>)
     } catch (err) {
-      console.error('Failed to fetch categories:', err)
+      console.error('Failed to fetch categories:', apiErrorMessage(err))
     }
   }
 
@@ -112,36 +118,55 @@ export function ProductsPage() {
     fetchProducts()
     fetchCategories()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filter])
+  }, [page, filter, debouncedSearch])
 
-  // Debounced search resets to page 1
+  // Debounced search resets to page 1 — single request after typing stops
   useEffect(() => {
     const t = setTimeout(() => {
+      setDebouncedSearch(search)
       if (page !== 1) setPage(1)
-      else fetchProducts()
-    }, search ? 400 : 0)
+    }, 400)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search])
 
   // ── Mutations ─────────────────────────────────────────────────────────────
 
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // matches backend limit
+
+  const validateImageFile = (file: File): string | null => {
+    if (!file.type.startsWith('image/')) return 'Only image files are allowed.'
+    if (file.size > MAX_IMAGE_BYTES) return 'Image must be 5 MB or smaller.'
+    return null
+  }
+
+  const uploadProductImage = async (file: File): Promise<string | null> => {
+    const err = validateImageFile(file)
+    if (err) {
+      alert({ variant: 'error', message: err })
+      return null
+    }
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('folder', 'products')
+    try {
+      const uploadResponse = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return uploadResponse.data.url as string
+    } catch {
+      alert({ variant: 'error', message: 'Failed to upload image. Try a URL instead.' })
+      return null
+    }
+  }
+
   const handleCreateProduct = async (data: any) => {
     try {
       let imageUrl = data.imageUrl
       if (data.imageMethod === 'file' && data.imageFile) {
-        const formData = new FormData()
-        formData.append('file', data.imageFile)
-        formData.append('folder', 'products')
-        try {
-          const uploadResponse = await api.post('/uploads', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          })
-          imageUrl = uploadResponse.data.url
-        } catch {
-          alert({ variant: 'error', message: 'Failed to upload image. Try a URL instead.' })
-          return
-        }
+        const uploaded = await uploadProductImage(data.imageFile)
+        if (!uploaded) return
+        imageUrl = uploaded
       }
 
       await api.post('/products', {
@@ -162,18 +187,9 @@ export function ProductsPage() {
     try {
       let imageUrl = data.imageUrl
       if (data.imageMethod === 'file' && data.imageFile) {
-        const formData = new FormData()
-        formData.append('file', data.imageFile)
-        formData.append('folder', 'products')
-        try {
-          const uploadResponse = await api.post('/uploads', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          })
-          imageUrl = uploadResponse.data.url
-        } catch {
-          alert({ variant: 'error', message: 'Failed to upload image. Try a URL instead.' })
-          return
-        }
+        const uploaded = await uploadProductImage(data.imageFile)
+        if (!uploaded) return
+        imageUrl = uploaded
       }
 
       await api.patch(`/products/${selectedProduct.id}`, {
@@ -258,7 +274,7 @@ export function ProductsPage() {
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Refresh
           </Button>
-          <Button onClick={() => setShowAddDialog(true)}>Add product</Button>
+          {isSuperAdmin && <Button onClick={() => setShowAddDialog(true)}>Add product</Button>}
         </div>
       </div>
 
@@ -409,14 +425,20 @@ export function ProductsPage() {
                     </td>
                     {/* Actions */}
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(p)}>
-                          <Pencil className="h-4 w-4" />
+                      {isSuperAdmin ? (
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="icon" title="Edit" onClick={() => openEditDialog(p)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" title="Delete" onClick={() => openDeleteDialog(p)}>
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button variant="ghost" size="icon" title="View" onClick={() => setViewingProduct(p)}>
+                          <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openDeleteDialog(p)}>
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                        </Button>
-                      </div>
+                      )}
                     </td>
                   </tr>
                 )
@@ -489,6 +511,50 @@ export function ProductsPage() {
               }}
               isEditing
             />
+          </div>
+        </div>
+      )}
+
+      {/* Product View Dialog (non-super-admin) */}
+      {viewingProduct && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setViewingProduct(null)}>
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{viewingProduct.nameEn}</h2>
+                <p className="mt-1 font-mono text-xs text-slate-400">{viewingProduct.sku ?? viewingProduct.id.slice(0, 8)}</p>
+              </div>
+              <Badge variant={statusVariant[viewingProduct.status] ?? 'default'}>
+                {viewingProduct.status ? viewingProduct.status.charAt(0) + viewingProduct.status.slice(1).toLowerCase() : '—'}
+              </Badge>
+            </div>
+            {viewingProduct.primaryImageUrl && (
+              <img src={viewingProduct.primaryImageUrl} alt={viewingProduct.nameEn} className="mb-4 h-40 w-full rounded-xl object-cover" />
+            )}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {[
+                { label: 'Category', value: viewingProduct.categoryName ?? '—' },
+                { label: 'Partner', value: viewingProduct.partnerName ?? '—' },
+                { label: 'Price', value: formatPrice(viewingProduct.priceCents) },
+                { label: 'Stock', value: viewingProduct.stock === 0 ? 'Out of stock' : String(viewingProduct.stock) },
+                { label: 'Sold', value: String(viewingProduct.soldCount) },
+                { label: 'Rating', value: Number(viewingProduct.ratingAvg) > 0 ? `${Number(viewingProduct.ratingAvg).toFixed(1)} ★` : '—' },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
+                  <p className="text-xs text-slate-400">{label}</p>
+                  <p className="mt-1 font-semibold text-slate-800 dark:text-slate-100">{value}</p>
+                </div>
+              ))}
+              {viewingProduct.descriptionEn && (
+                <div className="col-span-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
+                  <p className="text-xs text-slate-400">Description</p>
+                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">{viewingProduct.descriptionEn}</p>
+                </div>
+              )}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button variant="outline" onClick={() => setViewingProduct(null)}>Close</Button>
+            </div>
           </div>
         </div>
       )}

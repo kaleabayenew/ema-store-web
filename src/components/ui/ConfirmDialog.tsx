@@ -253,7 +253,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       )}
 
       {/* ── Toasts ── */}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-[101] flex w-full max-w-sm flex-col gap-2">
+      <div className="pointer-events-none fixed right-4 top-20 z-[101] flex w-full max-w-sm flex-col gap-2">
         {toasts.map((t) => {
           const Icon = t.variant === 'error' ? AlertTriangle : t.variant === 'success' ? CheckCircle2 : Info
           const color = t.variant === 'error' ? 'text-red-600 dark:text-red-400' : t.variant === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-brand-600 dark:text-brand-400'

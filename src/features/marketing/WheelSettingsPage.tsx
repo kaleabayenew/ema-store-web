@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Settings, RefreshCw, Save, Loader2, Plus, Trash2 } from 'lucide-react'
+import { RefreshCw, Save, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -66,7 +66,7 @@ export function WheelSettingsPage() {
   const totalWeight = slices.reduce((sum, s) => sum + (s.isActive ? s.probabilityWeight : 0), 0)
   let currentAngle = 0
 
-  const pieSlices = slices.map((slice, i) => {
+  const pieSlices = slices.map((slice) => {
     if (!slice.isActive) return null
 
     const sliceAngle = (slice.probabilityWeight / totalWeight) * 360

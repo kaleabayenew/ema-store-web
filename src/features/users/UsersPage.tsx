@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Plus, Search, Shield, UserRoundCog, Loader2, RefreshCw,
+  Plus, Search, Shield, Loader2, RefreshCw,
   Edit2, KeyRound, Ban, CheckCircle2, X,
 } from 'lucide-react'
 
@@ -12,6 +12,7 @@ import { useAlert, useConfirm, usePrompt } from '@/components/ui/ConfirmDialog'
 import { ROLE_COLORS, ROLE_LABELS } from '@/config/rbac'
 import { assignablePages } from '@/config/navigation'
 import api from '@/lib/api'
+import { PASSWORD_MIN_LENGTH, passwordPolicy } from '@/lib/validate'
 import type { Role } from '@/types/auth'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ export function UsersPage() {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const [search, setSearch]     = useState('')
-  const [total, setTotal]       = useState(0)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   const [editing, setEditing]   = useState<AdminUser | null>(null)
   const [editPages, setEditPages] = useState<string[]>([])
@@ -90,22 +91,20 @@ export function UsersPage() {
     setLoading(true); setError(null)
     try {
       const res = await api.get<StaffListResponse>('/admin/users', {
-        params: { search: search || undefined, limit: 100 },
+        params: { search: debouncedSearch || undefined, limit: 100 },
       })
       setUsers(res.data.users ?? [])
-      setTotal(res.data.total ?? 0)
     } catch (e: any) {
       setError(e.response?.data?.message ?? 'Failed to load users')
     } finally { setLoading(false) }
-  }, [search])
+  }, [debouncedSearch])
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
 
-  // Debounced search
+  // Debounced search — one request after typing stops
   useEffect(() => {
-    const t = setTimeout(fetchUsers, search ? 400 : 0)
+    const t = setTimeout(() => setDebouncedSearch(search), 400)
     return () => clearTimeout(t)
-    // eslint-disable-next-line
   }, [search])
 
   const openEdit = (u: AdminUser) => {
@@ -158,13 +157,14 @@ export function UsersPage() {
   const resetPassword = async (u: AdminUser) => {
     const pw = await promptDialog({
       title: `Reset password for ${nameOf(u)}`,
-      message: 'Enter a new password (minimum 6 characters).',
+      message: `Enter a new password (minimum ${PASSWORD_MIN_LENGTH} characters, letter + number).`,
       placeholder: 'New password',
       required: true,
       confirmText: 'Reset',
     })
-    if (!pw || pw.length < 6) {
-      if (pw !== null) alert({ variant: 'error', message: 'Password must be at least 6 characters.' })
+    const pwError = pw ? passwordPolicy(pw) : null
+    if (pwError) {
+      if (pw !== null) alert({ variant: 'error', message: pwError })
       return
     }
     try {
@@ -176,8 +176,9 @@ export function UsersPage() {
   }
 
   const handleAdd = async () => {
-    if (!addForm.password || addForm.password.length < 6) {
-      alert({ variant: 'error', message: 'Password must be at least 6 characters.' }); return
+    const pwError = addForm.password ? passwordPolicy(addForm.password) : 'Password is required.'
+    if (pwError) {
+      alert({ variant: 'error', message: pwError }); return
     }
     if (!addForm.role) { alert({ variant: 'error', message: 'Select a role.' }); return }
     setAdding(true)
@@ -399,7 +400,7 @@ export function UsersPage() {
               </div>
               <div>
                 <Label htmlFor="add-pw">Password</Label>
-                <Input id="add-pw" type="password" value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} placeholder="At least 6 characters" />
+                <Input id="add-pw" type="password" value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} placeholder={`At least ${PASSWORD_MIN_LENGTH} chars, letter + number`} />
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-2">

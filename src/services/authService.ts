@@ -1,11 +1,25 @@
 import api from '@/lib/api'
+import type { AuthSession, LoginPayload, Role, UserProfile } from '@/types/auth'
+
+export const KNOWN_ROLES = new Set<Role>([
+  'SUPER_ADMIN',
+  'ADMIN',
+  'MANAGEMENT',
+  'CUSTOMER_SUPPORT',
+  'PARTNER_MANAGER',
+  'PRODUCT_MANAGER',
+  'FINANCE',
+  'MARKETING',
+])
+
+function extractMessage(err: any, fallback: string): string {
+  const msg = err?.response?.data?.message
+  return typeof msg === 'string' && msg.length > 0 ? msg : fallback
+}
 
 // Admin login - uses real backend API
 export async function loginWithUsername(payload: LoginPayload): Promise<AuthSession> {
   try {
-    console.log('[Web Auth] Login attempt for:', payload.username);
-    
-    // Backend expects { email, password } for admin login
     const response = await api.post('/auth/login', {
       email: payload.username,
       password: payload.password,
@@ -14,15 +28,22 @@ export async function loginWithUsername(payload: LoginPayload): Promise<AuthSess
       timeout: 60000,
     })
 
-    console.log('[Web Auth] Login response received:', response.status);
     const backendData = response.data
 
-    // Transform backend response to frontend format
+    // Transform backend response to frontend format.
+    // Never default to SUPER_ADMIN — a missing/unknown role fails closed.
+    const rawRole: string | undefined =
+      backendData.user?.adminRole || backendData.user?.role
+    const role: Role | null = rawRole && KNOWN_ROLES.has(rawRole as Role) ? (rawRole as Role) : null
+    if (!role) {
+      throw new Error('Your account does not have admin access.')
+    }
+
     const user: UserProfile = {
       id: backendData.user.id,
       name: backendData.user.fullName,
       email: backendData.user.email,
-      role: backendData.user.adminRole || backendData.user.role || 'SUPER_ADMIN',
+      role,
       locale: 'en',
       allowedPages: backendData.user.allowedPages || [],
     }
@@ -35,32 +56,22 @@ export async function loginWithUsername(payload: LoginPayload): Promise<AuthSess
       requiresOtp: false, // Admin login may not require OTP
     }
 
-    console.log('[Web Auth] Login successful for user:', user.name);
     return session
   } catch (err: any) {
-    console.error('[Web Auth] Login error:', err);
-    console.error('[Web Auth] Error response:', err.response?.data);
-    
-    if (err.response?.data?.message) {
-      throw new Error(err.response.data.message);
-    }
-    throw new Error('Login failed. Please check your credentials.')
+    throw new Error(extractMessage(err, 'Login failed. Please check your credentials.'))
   }
 }
 
 export async function verifyOtp({ otp, otpSessionId }: { otp: string; otpSessionId: string }) {
+  if (otp.length !== 6) {
+    throw new Error('OTP must be 6 digits')
+  }
   try {
     const response = await api.post('/auth/verify-otp', { otp, otpSessionId })
     return response.data
-  } catch {
-    if (otp.length !== 6) {
-      throw new Error('OTP must be 6 digits')
-    }
-
-    return {
-      ok: true,
-      message: 'OTP verified successfully',
-    }
+  } catch (err: any) {
+    // Fail closed — never pretend an OTP was accepted.
+    throw new Error(extractMessage(err, 'Invalid or expired code. Please try again.'))
   }
 }
 
@@ -68,17 +79,15 @@ export async function requestPasswordReset(email: string) {
   try {
     const response = await api.post('/auth/forgot-password', { email })
     return response.data
-  } catch {
-    return {
-      ok: true,
-      message: 'A password reset link was sent to your email.',
-    }
+  } catch (err: any) {
+    throw new Error(extractMessage(err, 'Could not send reset email. Please try again.'))
   }
 }
 
 export async function refreshAccessToken() {
   try {
-    const response = await api.post('/auth/refresh-token')
+    // The HttpOnly cookie supplies the refresh token automatically.
+    const response = await api.post('/auth/refresh', {})
     return response.data
   } catch {
     throw new Error('Failed to refresh token')

@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useAlert } from '@/components/ui/ConfirmDialog'
 import api from '@/lib/api'
+import { useAuthStore } from '@/store/authStore'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -36,9 +37,21 @@ interface Partner {
   status: 'APPROVED' | 'PENDING' | 'SUSPENDED'
 }
 
+interface PartnerProduct {
+  id: string
+  name: string
+  price: number
+  stock: number
+  status: string
+  visible: boolean
+  imageUrl: string | null
+  createdAt: string
+}
+
 interface PartnerDetail extends Partner {
   phone?: string
   email?: string
+  productList?: PartnerProduct[]
 }
 
 type FilterStatus = 'All' | 'APPROVED' | 'PENDING' | 'SUSPENDED'
@@ -58,15 +71,19 @@ function formatDate(iso: string) {
 
 export function PartnersPage() {
   const alert = useAlert()
+  const { user } = useAuthStore()
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const [partners, setPartners]     = useState<Partner[]>([])
   const [total, setTotal]           = useState(0)
   const [page, setPage]             = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [search, setSearch]         = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filter, setFilter]         = useState<FilterStatus>('All')
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState<string | null>(null)
   const [selected, setSelected]     = useState<PartnerDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
 
   const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0, avgRating: 0 })
@@ -79,7 +96,7 @@ export function PartnersPage() {
     try {
       const response = await api.get('/admin/partners', {
         params: {
-          search,
+          search: debouncedSearch,
           status: filter === 'All' ? undefined : filter,
           page,
           limit: PAGE_SIZE,
@@ -101,16 +118,29 @@ export function PartnersPage() {
     }
   }
 
-  useEffect(() => { fetchPartners() /* eslint-disable-next-line */ }, [page, filter])
+  useEffect(() => { fetchPartners() /* eslint-disable-next-line */ }, [page, filter, debouncedSearch])
 
+  // Debounced search resets to page 1 — single request after typing stops
   useEffect(() => {
     const t = setTimeout(() => {
+      setDebouncedSearch(search)
       if (page !== 1) setPage(1)
-      else fetchPartners()
-    }, search ? 400 : 0)
+    }, 400)
     return () => clearTimeout(t)
     // eslint-disable-next-line
   }, [search])
+
+  async function viewDetails(p: Partner) {
+    setDetailLoading(true)
+    try {
+      const res = await api.get<{ partner: PartnerDetail }>(`/admin/partners/${p.id}`)
+      setSelected(res.data.partner ?? p)
+    } catch {
+      setSelected(p)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
 
   async function updateStatus(partner: Partner, status: 'APPROVED' | 'PENDING' | 'SUSPENDED') {
     setStatusUpdatingId(partner.id)
@@ -291,8 +321,8 @@ export function PartnersPage() {
                       <DropdownMenuContent align="end" className="w-48">
                         <div className="px-2 py-1.5 text-xs font-semibold text-slate-400">Actions</div>
                         <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
-                        <DropdownMenuItem onClick={() => setSelected(p)}>
-                          <Eye className="mr-2 h-4 w-4" />View details
+                        <DropdownMenuItem onClick={() => viewDetails(p)}>
+                          {detailLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Eye className="mr-2 h-4 w-4" />}View details
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => p.phone && navigator.clipboard.writeText(p.phone)}>
                           <Phone className="mr-2 h-4 w-4" />Copy phone
@@ -300,19 +330,23 @@ export function PartnersPage() {
                         <DropdownMenuItem onClick={() => navigator.clipboard.writeText(p.id)}>
                           <Clipboard className="mr-2 h-4 w-4" />Copy partner ID
                         </DropdownMenuItem>
-                        <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
-                        <DropdownMenuItem
-                          disabled={statusUpdatingId === p.id}
-                          onClick={() => updateStatus(p, p.status === 'APPROVED' ? 'SUSPENDED' : 'APPROVED')}
-                          className={p.status === 'APPROVED' ? 'text-red-500 focus:text-red-600' : 'text-emerald-600 focus:text-emerald-700'}
-                        >
-                          {statusUpdatingId === p.id
-                            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            : p.status === 'APPROVED'
-                              ? <Ban className="mr-2 h-4 w-4" />
-                              : <ShieldCheck className="mr-2 h-4 w-4" />}
-                          {p.status === 'APPROVED' ? 'Suspend partner' : 'Approve partner'}
-                        </DropdownMenuItem>
+                        {isSuperAdmin && (
+                          <>
+                            <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+                            <DropdownMenuItem
+                              disabled={statusUpdatingId === p.id}
+                              onClick={() => updateStatus(p, p.status === 'APPROVED' ? 'SUSPENDED' : 'APPROVED')}
+                              className={p.status === 'APPROVED' ? 'text-red-500 focus:text-red-600' : 'text-emerald-600 focus:text-emerald-700'}
+                            >
+                              {statusUpdatingId === p.id
+                                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                : p.status === 'APPROVED'
+                                  ? <Ban className="mr-2 h-4 w-4" />
+                                  : <ShieldCheck className="mr-2 h-4 w-4" />}
+                              {p.status === 'APPROVED' ? 'Suspend partner' : 'Approve partner'}
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -418,6 +452,40 @@ export function PartnersPage() {
               )}
             </div>
 
+            {/* Products list */}
+            {selected.productList && selected.productList.length > 0 && (
+              <div className="border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Products ({selected.productList.length})
+                </p>
+                <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                  {selected.productList.map((pr) => (
+                    <div key={pr.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-2.5 dark:bg-slate-800">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white dark:bg-slate-900">
+                        {pr.imageUrl
+                          ? <img src={pr.imageUrl} alt={pr.name} className="h-full w-full object-cover" />
+                          : <span className="text-xs text-slate-400">—</span>}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{pr.name}</p>
+                        <p className="text-xs text-slate-400">
+                          ETB {pr.price.toLocaleString('en-ET')} · Stock {pr.stock}
+                        </p>
+                      </div>
+                      <Badge variant={pr.status === 'APPROVED' ? 'success' : pr.status === 'REJECTED' ? 'danger' : 'warning'}>
+                        {pr.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {selected.productList && selected.productList.length === 0 && (
+              <div className="border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+                <p className="text-xs text-slate-400">No products listed for this partner yet.</p>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-3 border-t border-slate-100 px-5 pb-5 pt-3 dark:border-slate-800">
               <Button
@@ -427,19 +495,25 @@ export function PartnersPage() {
               >
                 <Phone className="mr-2 h-4 w-4" />Copy Phone
               </Button>
-              <Button
-                className={`flex-1 text-white ${selected.status === 'APPROVED' ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-                disabled={statusUpdatingId === selected.id}
-                onClick={() => { updateStatus(selected, selected.status === 'APPROVED' ? 'SUSPENDED' : 'APPROVED'); setSelected(null) }}
-              >
-                {statusUpdatingId === selected.id ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : selected.status === 'APPROVED' ? (
-                  <><Ban className="mr-2 h-4 w-4" />Suspend</>
-                ) : (
-                  <><ShieldCheck className="mr-2 h-4 w-4" />Approve</>
-                )}
-              </Button>
+              {isSuperAdmin ? (
+                <Button
+                  className={`flex-1 text-white ${selected.status === 'APPROVED' ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                  disabled={statusUpdatingId === selected.id}
+                  onClick={() => { updateStatus(selected, selected.status === 'APPROVED' ? 'SUSPENDED' : 'APPROVED'); setSelected(null) }}
+                >
+                  {statusUpdatingId === selected.id ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : selected.status === 'APPROVED' ? (
+                    <><Ban className="mr-2 h-4 w-4" />Suspend</>
+                  ) : (
+                    <><ShieldCheck className="mr-2 h-4 w-4" />Approve</>
+                  )}
+                </Button>
+              ) : (
+                <Button variant="outline" className="flex-1" onClick={() => setSelected(null)}>
+                  Close
+                </Button>
+              )}
             </div>
           </div>
         </div>

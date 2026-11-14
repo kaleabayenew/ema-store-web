@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { ADMIN_BASE } from '@/lib/basePath'
 
 import { SessionExpiredDialog } from './components/auth/SessionExpiredDialog'
 import { AppLayout } from './components/layout/AppLayout'
@@ -6,6 +8,7 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { ConfirmProvider } from './components/ui/ConfirmDialog'
 import { TopProgressBar } from './components/ui/TopProgressBar'
 import { AboutPage } from './features/about/AboutPage'
+import { AnnouncementsPage } from './features/announcements/AnnouncementsPage'
 import { ApprovalsPage } from './features/approvals/ApprovalsPage'
 import { ForbiddenPage } from './features/auth/ForbiddenPage'
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage'
@@ -18,6 +21,7 @@ import { CreditPage } from './features/credits/CreditPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { DeliveryPage } from './features/delivery/DeliveryPage'
 import { FinancePage } from './features/finance/FinancePage'
+import { FeedbackPage } from './features/feedback/FeedbackPage'
 import { FlashDealsPage } from './features/flash-deals/FlashDealsPage'
 import { IntegrationsPage } from './features/integrations/IntegrationsPage'
 import { MarketingPage } from './features/marketing/MarketingPage'
@@ -26,22 +30,40 @@ import { OrdersPage } from './features/orders/OrdersPage'
 import { PartnersPage } from './features/partners/PartnersPage'
 import { ProductsPage } from './features/products/ProductsPage'
 import { ReportsPage } from './features/reports/ReportsPage'
+import { ReviewsPage } from './features/reviews/ReviewsPage'
 import { RidePage } from './features/ride/RidePage'
+import { NotFoundPage } from './features/shared/NotFoundPage'
 import { SettingsPage } from './features/settings/SettingsPage'
 import { SupportPage } from './features/support/SupportPage'
 import { UsersPage } from './features/users/UsersPage'
 import { useAutoLogout } from './hooks/useAutoLogout'
 import { ProtectedRoute } from './routes/ProtectedRoute'
+import { bootstrapSession } from './services/session'
 import { useAuthStore } from './store/authStore'
 
 function App() {
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, sessionChecked } = useAuthStore()
   useAutoLogout()
+
+  // Restore the session from the HttpOnly cookie once on startup.
+  useEffect(() => {
+    void bootstrapSession()
+  }, [])
+
+  // Hold rendering until the session check finishes so protected routes
+  // never flash the login page for a user with a valid cookie session.
+  if (!sessionChecked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-brand-600" />
+      </div>
+    )
+  }
 
   return (
     <ErrorBoundary>
       <ConfirmProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={ADMIN_BASE}>
       <TopProgressBar />
       <SessionExpiredDialog />
       <Routes>
@@ -75,7 +97,10 @@ function App() {
             <Route path="/credits"   element={<CreditPage />} />
             <Route path="/approvals" element={<ApprovalsPage />} />
             <Route path="/banners"   element={<PaymentBannersPage />} />
+            <Route path="/announcements" element={<AnnouncementsPage />} />
             <Route path="/about"     element={<AboutPage />} />
+            <Route path="/reviews"   element={<ReviewsPage />} />
+            <Route path="/feedback"  element={<FeedbackPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
 
             {/* Admin */}
@@ -90,6 +115,9 @@ function App() {
                 Profile page coming soon
               </div>
             } />
+
+            {/* Catch-all — unknown URLs show 404 inside the layout */}
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Route>
       </Routes>

@@ -20,6 +20,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   '/delivery': ['SUPER_ADMIN'],
   '/approvals': ['SUPER_ADMIN', 'PARTNER_MANAGER', 'PRODUCT_MANAGER'],
   '/banners': ['SUPER_ADMIN', 'MANAGEMENT', 'MARKETING'],
+  '/announcements': ['SUPER_ADMIN', 'MANAGEMENT', 'MARKETING'],
   '/notifications': ['SUPER_ADMIN', 'MANAGEMENT', 'MARKETING'],
   '/users': ['SUPER_ADMIN'],
   '/settings': ['SUPER_ADMIN'],
@@ -29,7 +30,8 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   '/wallet': ['SUPER_ADMIN'],
   '/payment-methods': ['SUPER_ADMIN'],
   '/coupons': ['SUPER_ADMIN'],
-  '/reviews': ['SUPER_ADMIN'],
+  '/reviews': ['SUPER_ADMIN', 'MANAGEMENT', 'CUSTOMER_SUPPORT', 'PRODUCT_MANAGER'],
+  '/feedback': ['SUPER_ADMIN', 'MANAGEMENT', 'CUSTOMER_SUPPORT'],
   '/recently-viewed': ['SUPER_ADMIN'],
   '/new-arrivals': ['SUPER_ADMIN'],
   '/seasonal-promotions': ['SUPER_ADMIN'],
@@ -64,6 +66,26 @@ export function canAccessRoute(role: Role | null, pathname: string): boolean {
   const route = Object.keys(ROUTE_ACCESS).find((key) => pathname === key || pathname.startsWith(key + '/')) ?? pathname
   const allowed = ROUTE_ACCESS[route] ?? []
   return allowed.includes(role)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Single source of truth for "can this user open this page".
+//  Used by BOTH the sidebar (link visibility) and the route guard so they
+//  can never disagree: per-user allowedPages win, then role rules.
+// ─────────────────────────────────────────────────────────────────────────────
+export function canAccessPage(
+  user: { role: Role; allowedPages?: string[] } | null | undefined,
+  pathname: string,
+): boolean {
+  if (!user) return false
+  if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') return true
+  const allowedPages = user.allowedPages ?? []
+  if (allowedPages.length > 0) {
+    return allowedPages.some(
+      (p) => pathname === p || pathname.startsWith(p + '/'),
+    )
+  }
+  return canAccessRoute(user.role, pathname)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

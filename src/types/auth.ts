@@ -23,7 +23,6 @@ export interface UserProfile {
 export interface LoginPayload {
   username: string
   password: string
-  role: Role
 }
 
 export interface AuthSession {

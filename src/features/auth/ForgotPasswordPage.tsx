@@ -30,6 +30,7 @@ export function ForgotPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10 dark:bg-slate-950">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-soft dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-6 text-center">
+          <img src="/image/logo_full.svg" alt="Ema Store" className="mx-auto mb-4 h-12 w-auto" />
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Reset password</h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">We’ll send a reset link to your email.</p>
         </div>

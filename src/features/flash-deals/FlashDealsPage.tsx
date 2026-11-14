@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { Flame, Clock, Tag, Plus, Trash2, Loader2 } from 'lucide-react'
+import { Flame, Clock, Tag, Plus, Trash2, Loader2, Pencil } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { dateAfter, dateInFuture, inRange, isInteger, isUrl, maxLength, required, validate } from '@/lib/validate'
 import { api } from '@/lib/api'
+import { apiErrorMessage } from '@/lib/errors'
 
 interface FlashDeal {
   id: string
@@ -174,6 +175,7 @@ export function FlashDealsPage() {
   const [deals, setDeals] = useState<FlashDeal[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [editingDeal, setEditingDeal]           = useState<FlashDeal | null>(null)
   const [filter, setFilter] = useState<'All' | 'Active' | 'Ended'>('All')
   const [form, setForm] = useState<DealForm>(emptyForm)
   const [submitting, setSubmitting] = useState(false)
@@ -190,7 +192,7 @@ export function FlashDealsPage() {
       const response = await api.get('/flash-deals')
       setDeals(response.data.deals || [])
     } catch (error) {
-      console.error('Failed to load flash deals:', error)
+      console.error('Failed to load flash deals:', apiErrorMessage(error))
     } finally {
       setLoading(false)
     }
@@ -259,7 +261,7 @@ export function FlashDealsPage() {
       await api.delete(`/flash-deals/${id}`)
       setDeals(deals.filter((d) => d.id !== id))
     } catch (error) {
-      console.error('Failed to delete flash deal:', error)
+      console.error('Failed to delete flash deal:', apiErrorMessage(error))
     }
   }
 
@@ -275,11 +277,12 @@ export function FlashDealsPage() {
         )
       }
     } catch (error) {
-      console.error('Failed to toggle flash deal:', error)
+      console.error('Failed to toggle flash deal:', apiErrorMessage(error))
     }
   }
 
   const openCreateDialog = () => {
+    setEditingDeal(null)
     const now = new Date()
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
     setForm({ ...emptyForm, starts_at: toLocalInput(now), ends_at: toLocalInput(tomorrow) })
@@ -287,9 +290,23 @@ export function FlashDealsPage() {
     setShowCreateDialog(true)
   }
 
+  const openEditDialog = (deal: FlashDeal) => {
+    setEditingDeal(deal)
+    setForm({
+      title: deal.title,
+      description: deal.description ?? '',
+      discount_percent: String(deal.discount_percent),
+      starts_at: toLocalInput(new Date(deal.starts_at)),
+      ends_at: toLocalInput(new Date(deal.ends_at)),
+      image_url: deal.image_url ?? '',
+    })
+    setFormError(null)
+  }
+
   const closeCreateDialog = () => {
     if (submitting || imageUploading) return
     setShowCreateDialog(false)
+    setEditingDeal(null)
   }
 
   const updateForm = (field: keyof DealForm, value: string) => {
@@ -317,7 +334,7 @@ export function FlashDealsPage() {
       required(form.starts_at, 'Start time'),
       required(form.ends_at, 'End time'),
       dateAfter(form.ends_at, form.starts_at, 'End time', 'start time'),
-      dateInFuture(form.ends_at, 'End time'),
+      editingDeal ? null : dateInFuture(form.ends_at, 'End time'),
       form.image_url.trim() ? isUrl(form.image_url, true) : null,
     )
     if (err) return setFormError(err)
@@ -325,18 +342,24 @@ export function FlashDealsPage() {
     try {
       setSubmitting(true)
       setFormError(null)
-      await api.post('/flash-deals', {
+      const payload = {
         title,
         description: form.description.trim() || null,
         discountPercent: discount,
         startsAt: start.toISOString(),
         endsAt: end.toISOString(),
         imageUrl: form.image_url.trim() || null,
-      })
+      }
+      if (editingDeal) {
+        await api.patch(`/flash-deals/${editingDeal.id}`, payload)
+      } else {
+        await api.post('/flash-deals', payload)
+      }
       setShowCreateDialog(false)
+      setEditingDeal(null)
       await loadDeals()
     } catch (error) {
-      console.error('Failed to create flash deal:', error)
+      console.error('Failed to create flash deal:', apiErrorMessage(error))
       const resp = (error as { response?: { data?: { message?: string } } })?.response
       setFormError(resp?.data?.message || 'Could not create the flash deal. Please check your connection and try again.')
     } finally {
@@ -447,6 +470,15 @@ export function FlashDealsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          title="Edit"
+                          onClick={() => openEditDialog(deal)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Delete"
                           onClick={() => handleDelete(deal.id)}
                         >
                           <Trash2 className="h-4 w-4 text-red-600" />
@@ -482,8 +514,8 @@ export function FlashDealsPage() {
         )}
       </div>
 
-      {/* Create Deal Dialog */}
-      {showCreateDialog && (
+      {/* Create / Edit Deal Dialog */}
+      {(showCreateDialog || editingDeal) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeCreateDialog}>
           <form
             onSubmit={handleCreate}
@@ -491,7 +523,7 @@ export function FlashDealsPage() {
             className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900"
           >
             <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Create Flash Deal
+              {editingDeal ? 'Edit Flash Deal' : 'Create Flash Deal'}
             </h2>
 
             <div className="space-y-4">
@@ -590,7 +622,7 @@ export function FlashDealsPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={submitting || imageUploading}>
-                {submitting ? 'Creating...' : imageUploading ? 'Uploading image...' : 'Create'}
+                {submitting ? 'Saving...' : imageUploading ? 'Uploading image...' : editingDeal ? 'Save changes' : 'Create'}
               </Button>
             </div>
           </form>

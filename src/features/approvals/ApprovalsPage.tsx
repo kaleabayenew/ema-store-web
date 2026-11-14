@@ -1,49 +1,143 @@
-import { useState } from 'react'
-import { Building2, Boxes, CheckCircle2, XCircle, Clock } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Building2, Boxes, CheckCircle2, XCircle, Loader2, Mail } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-
-const stats = [
-  { label: 'Pending partners',  value: '31',  delta: '+8',  tone: 'warning', icon: Building2 },
-  { label: 'Pending products',  value: '421', delta: '+64', tone: 'warning', icon: Boxes },
-  { label: 'Approved today',    value: '18',  delta: '+4',  tone: 'success', icon: CheckCircle2 },
-  { label: 'Rejected today',    value: '5',   delta: '+2',  tone: 'danger',  icon: XCircle },
-]
+import api from '@/lib/api'
+import { useAuthStore } from '@/store/authStore'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 
 type ApprovalType = 'PARTNER' | 'PRODUCT'
+
+interface ApprovalDetail {
+  [key: string]: unknown
+}
 
 interface ApprovalItem {
   id: string
   type: ApprovalType
   name: string
   submittedBy: string
-  category: string
-  submitted: string
-  priority: 'HIGH' | 'NORMAL'
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'
-  details: string
+  submittedAt: string | null
+  email: string | null
+  category?: string | null
+  price?: number | null
+  stock?: number | null
+  imageUrl?: string | null
+  detail: ApprovalDetail
 }
 
-const items: ApprovalItem[] = [
-  { id: 'PA-031', type: 'PARTNER',  name: 'Tigist Fashions',      submittedBy: 'Tigist Alemu',   category: 'Fashion',    submitted: '12 Jul', priority: 'HIGH',   status: 'PENDING', details: 'New partner application with business license attached.' },
-  { id: 'PA-032', type: 'PARTNER',  name: 'Selam Crafts',         submittedBy: 'Selam Haile',    category: 'Crafts',     submitted: '11 Jul', priority: 'NORMAL', status: 'PENDING', details: 'Handcraft seller from Merkato area.' },
-  { id: 'PR-421', type: 'PRODUCT',  name: 'Handwoven Market Basket',submittedBy: 'Selam Crafts', category: 'Home',       submitted: '12 Jul', priority: 'NORMAL', status: 'PENDING', details: 'Natural fiber basket, price ETB 1,450. Images attached.' },
-  { id: 'PR-422', type: 'PRODUCT',  name: 'Berbere Spice 500g',   submittedBy: 'Dawit Foods',    category: 'Food',       submitted: '12 Jul', priority: 'HIGH',   status: 'PENDING', details: 'Bulk spice variant — new SKU. Shelf life 18 months.' },
-  { id: 'PR-420', type: 'PRODUCT',  name: 'Leather Sandals — Brown',submittedBy: 'Aster Mart',   category: 'Fashion',    submitted: '11 Jul', priority: 'NORMAL', status: 'PENDING', details: 'Genuine leather, sizes 36-45. Price ETB 1,200.' },
-  { id: 'PA-030', type: 'PARTNER',  name: 'Henok Organics',       submittedBy: 'Henok Mesfin',   category: 'Health',     submitted: '10 Jul', priority: 'NORMAL', status: 'APPROVED',details: 'Approved by Biruk M. on 11 Jul.' },
-  { id: 'PR-419', type: 'PRODUCT',  name: 'Ethiopian Cookbook 2nd Ed.',submittedBy: 'Aster Mart', category: 'Books',     submitted: '10 Jul', priority: 'NORMAL', status: 'REJECTED',details: 'Rejected: duplicate ISBN, existing listing found.' },
-]
+function formatDate(d: string | null | undefined) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function DetailRow({ label, value }: { label: string; value: unknown }) {
+  if (value === null || value === undefined || value === '') return null
+  return (
+    <div className="flex items-start justify-between gap-4 py-1.5">
+      <span className="text-sm text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-right text-sm font-medium text-slate-900 dark:text-slate-100">{String(value)}</span>
+    </div>
+  )
+}
 
 export function ApprovalsPage() {
-  const [filter, setFilter] = useState<'All' | ApprovalType | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING')
-  const [selected, setSelected] = useState<ApprovalItem | null>(null)
+  const { user } = useAuthStore()
+  const confirmDialog = useConfirm()
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
-  const filtered = items.filter((i) => {
-    if (filter === 'All') return true
-    if (filter === 'PARTNER' || filter === 'PRODUCT') return i.type === filter
-    return i.status === filter
-  })
+  const [items, setItems] = useState<ApprovalItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<'All' | ApprovalType>('All')
+  const [selected, setSelected] = useState<ApprovalItem | null>(null)
+  const [acting, setActing] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionResult, setActionResult] = useState<string | null>(null)
+  const [showRejectForm, setShowRejectForm] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+
+  const fetchApprovals = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api.get<{ partners: ApprovalItem[]; products: ApprovalItem[] }>('/admin/approvals')
+      setItems([...(res.data.partners ?? []), ...(res.data.products ?? [])])
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? 'Failed to load approvals')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { fetchApprovals() }, [])
+
+  const pendingPartners = items.filter((i) => i.type === 'PARTNER').length
+  const pendingProducts = items.filter((i) => i.type === 'PRODUCT').length
+
+  const filtered = items.filter((i) => filter === 'All' || i.type === filter)
+
+  const closeModal = () => {
+    setSelected(null)
+    setActionError(null)
+    setActionResult(null)
+    setShowRejectForm(false)
+    setRejectReason('')
+  }
+
+  const review = async (action: 'approve' | 'reject') => {
+    if (!selected) return
+    setActing(true)
+    setActionError(null)
+    setActionResult(null)
+    try {
+      const res = await api.post<{ emailSent: boolean }>(
+        `/admin/approvals/${selected.type}/${selected.id}/review`,
+        { action, reason: action === 'reject' ? rejectReason.trim() : undefined },
+      )
+      setActionResult(
+        action === 'approve'
+          ? `Approved. ${res.data.emailSent ? 'Notification email sent.' : 'Email not sent (no address or SMTP not configured).'}`
+          : `Rejected. ${res.data.emailSent ? 'Notification email sent.' : 'Email not sent (no address or SMTP not configured).'}`,
+      )
+      setItems((prev) => prev.filter((i) => !(i.type === selected.type && i.id === selected.id)))
+      setTimeout(closeModal, 1200)
+    } catch (err: any) {
+      setActionError(err.response?.data?.message ?? 'Action failed')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  const handleApprove = async () => {
+    if (!selected) return
+    const ok = await confirmDialog({
+      title: `Approve ${selected.name}?`,
+      message: 'This will approve the submission and email a notification to the partner.',
+      confirmText: 'Approve',
+    })
+    if (ok) review('approve')
+  }
+
+  const handleRejectClick = async () => {
+    if (!selected) return
+    if (!rejectReason.trim()) {
+      const ok = await confirmDialog({
+        title: `Reject ${selected.name}?`,
+        message: 'A rejection reason is required and will be included in the email to the partner.',
+        confirmText: 'Continue',
+      })
+      if (!ok) return
+    }
+    setShowRejectForm(true)
+  }
+
+  const stats = [
+    { label: 'Pending partners', value: pendingPartners, icon: Building2 },
+    { label: 'Pending products', value: pendingProducts, icon: Boxes },
+    { label: 'Total pending',   value: items.length,        icon: CheckCircle2 },
+  ]
 
   return (
     <div className="space-y-6">
@@ -52,99 +146,182 @@ export function ApprovalsPage() {
           <p className="text-sm font-medium text-brand-600">Approvals queue</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Approvals</h1>
         </div>
+        <Button variant="outline" onClick={fetchApprovals} disabled={loading}>
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Refresh
+        </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map(({ label, value, delta, tone, icon: Icon }) => (
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
+          {error}
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        {stats.map(({ label, value, icon: Icon }) => (
           <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">{label}</span>
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"><Icon className="h-4 w-4" /></span>
             </div>
             <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-            <Badge variant={tone as 'success' | 'warning' | 'danger'} className="mt-2">{delta}</Badge>
           </div>
         ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        {/* List */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-wrap gap-2 border-b border-slate-200 p-4 dark:border-slate-800">
-            {(['PENDING', 'PARTNER', 'PRODUCT', 'APPROVED', 'REJECTED', 'All'] as const).map((f) => (
-              <button key={f} type="button" onClick={() => setFilter(f)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-medium capitalize transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}>
-                {f.charAt(0) + f.slice(1).toLowerCase()}
-              </button>
-            ))}
-          </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {filtered.map((item) => (
-              <button key={item.id} type="button" onClick={() => setSelected(item)}
-                className={`w-full p-4 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/50 ${selected?.id === item.id ? 'bg-brand-50 dark:bg-brand-950/20' : ''}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={item.type === 'PARTNER' ? 'info' : 'warning'} className="text-[10px]">{item.type}</Badge>
-                      {item.priority === 'HIGH' && <Badge variant="danger" className="text-[10px]">HIGH PRIORITY</Badge>}
-                    </div>
-                    <p className="mt-1 truncate font-medium text-slate-900 dark:text-slate-100">{item.name}</p>
-                    <p className="text-xs text-slate-500">{item.id} · {item.submittedBy} · {item.submitted}</p>
-                  </div>
-                  <Badge variant={item.status === 'PENDING' ? 'warning' : item.status === 'APPROVED' ? 'success' : 'danger'}>
-                    {item.status.charAt(0) + item.status.slice(1).toLowerCase()}
-                  </Badge>
-                </div>
-              </button>
-            ))}
-          </div>
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap gap-2 border-b border-slate-200 p-4 dark:border-slate-800">
+          {(['All', 'PARTNER', 'PRODUCT'] as const).map((f) => (
+            <button key={f} type="button" onClick={() => setFilter(f)}
+              className={`rounded-xl px-3 py-1.5 text-xs font-medium capitalize transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}>
+              {f === 'PARTNER' ? 'Partners' : f === 'PRODUCT' ? 'Products' : 'All'}
+            </button>
+          ))}
         </div>
-
-        {/* Detail */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          {selected ? (
-            <div className="p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <Badge variant={selected.type === 'PARTNER' ? 'info' : 'warning'}>{selected.type}</Badge>
-                <span className="font-mono text-xs text-slate-400">{selected.id}</span>
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{selected.name}</h2>
-                <p className="mt-1 text-sm text-slate-500">Submitted by <span className="font-medium">{selected.submittedBy}</span> on {selected.submitted}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                {selected.details}
-              </div>
-              <div className="flex gap-2">
-                <Badge variant="default">Category: {selected.category}</Badge>
-                <Badge variant={selected.priority === 'HIGH' ? 'danger' : 'default'}>Priority: {selected.priority}</Badge>
-              </div>
-              {selected.status === 'PENDING' && (
-                <div className="flex gap-3 pt-2">
-                  <Button className="flex-1 gap-2 bg-brand-600 hover:bg-brand-700">
-                    <CheckCircle2 className="h-4 w-4" />Approve
-                  </Button>
-                  <Button variant="outline" className="flex-1 gap-2 border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30">
-                    <XCircle className="h-4 w-4" />Reject
-                  </Button>
-                </div>
-              )}
-              {selected.status !== 'PENDING' && (
-                <div className={`rounded-xl p-3 text-sm font-medium ${selected.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400'}`}>
-                  This item has been {selected.status.toLowerCase()}.
-                </div>
-              )}
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-7 w-7 animate-spin text-brand-600" />
             </div>
-          ) : (
-            <div className="flex h-64 items-center justify-center text-slate-400">
-              <div className="text-center">
-                <Clock className="mx-auto h-10 w-10 mb-2 opacity-30" />
-                <p className="text-sm">Select an item to review</p>
-              </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
+              <CheckCircle2 className="h-10 w-10 opacity-40" />
+              <p className="text-sm">Nothing pending approval.</p>
             </div>
-          )}
+          ) : filtered.map((item) => (
+            <button key={`${item.type}-${item.id}`} type="button" onClick={() => setSelected(item)}
+              className="flex w-full items-center justify-between gap-3 p-4 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
+              <div className="flex min-w-0 items-center gap-3">
+                {item.imageUrl ? (
+                  <img src={item.imageUrl} alt="" className="h-10 w-10 flex-shrink-0 rounded-lg object-cover" />
+                ) : (
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800">
+                    {item.type === 'PARTNER' ? <Building2 className="h-5 w-5" /> : <Boxes className="h-5 w-5" />}
+                  </span>
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={item.type === 'PARTNER' ? 'info' : 'warning'} className="text-[10px]">{item.type}</Badge>
+                  </div>
+                  <p className="mt-1 truncate font-medium text-slate-900 dark:text-slate-100">{item.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {item.submittedBy}
+                    {item.submittedAt ? ` · ${formatDate(item.submittedAt)}` : ''}
+                  </p>
+                </div>
+              </div>
+              <Badge variant="warning">Pending</Badge>
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* Detail popup */}
+      {selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeModal}>
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <Badge variant={selected.type === 'PARTNER' ? 'info' : 'warning'}>{selected.type === 'PARTNER' ? 'Partner application' : 'Product submission'}</Badge>
+              <button type="button" onClick={closeModal} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" aria-label="Close">✕</button>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {selected.imageUrl || selected.detail.logoUrl ? (
+                <img src={String(selected.imageUrl || selected.detail.logoUrl)} alt="" className="h-16 w-16 flex-shrink-0 rounded-xl object-cover" />
+              ) : (
+                <span className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-800">
+                  {selected.type === 'PARTNER' ? <Building2 className="h-8 w-8" /> : <Boxes className="h-8 w-8" />}
+                </span>
+              )}
+              <div className="min-w-0">
+                <h2 className="truncate text-xl font-semibold text-slate-900 dark:text-slate-100">{selected.name}</h2>
+                <p className="text-sm text-slate-500">Submitted by {selected.submittedBy}{selected.submittedAt ? ` on ${formatDate(selected.submittedAt)}` : ''}</p>
+              </div>
+            </div>
+
+            <div className="mt-5 divide-y divide-slate-100 rounded-xl border border-slate-200 px-4 dark:divide-slate-800 dark:border-slate-800">
+              {selected.type === 'PARTNER' ? (
+                <>
+                  <DetailRow label="Business name" value={selected.detail.businessName} />
+                  <DetailRow label="Owner name" value={selected.detail.ownerName} />
+                  <DetailRow label="Account email" value={selected.detail.accountEmail} />
+                  <DetailRow label="Partner email" value={selected.detail.partnerEmail} />
+                  <DetailRow label="Phone" value={selected.detail.phone} />
+                  <DetailRow label="City" value={selected.detail.city} />
+                  <DetailRow label="Address" value={selected.detail.address} />
+                  <DetailRow label="Rating" value={selected.detail.rating ? `${selected.detail.rating} (${selected.detail.reviewCount} reviews)` : 'No reviews yet'} />
+                  <DetailRow label="Products" value={selected.detail.productCount} />
+                </>
+              ) : (
+                <>
+                  <DetailRow label="Product" value={selected.detail.name} />
+                  <DetailRow label="Category" value={selected.detail.category} />
+                  <DetailRow label="Price" value={selected.detail.price != null ? `ETB ${selected.detail.price}` : null} />
+                  <DetailRow label="Stock" value={selected.detail.stock} />
+                  <DetailRow label="Partner" value={selected.detail.partnerName} />
+                  <DetailRow label="Partner owner" value={selected.detail.partnerOwner} />
+                  <DetailRow label="Partner email" value={selected.detail.partnerEmail} />
+                </>
+              )}
+              <DetailRow label="Submitted" value={formatDate(selected.submittedAt)} />
+            </div>
+
+            {Boolean(selected.detail.description || selected.detail.address) && (
+              <div className="mt-4">
+                {selected.detail.description ? (
+                  <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-300">{String(selected.detail.description)}</p>
+                ) : null}
+              </div>
+            )}
+
+            {actionResult && (
+              <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">{actionResult}</p>
+            )}
+            {actionError && (
+              <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-400">{actionError}</p>
+            )}
+
+            {isSuperAdmin && !actionResult && (
+              <div className="mt-5 space-y-3">
+                {showRejectForm && (
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Rejection reason (sent by email)</label>
+                    <textarea
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      rows={3}
+                      maxLength={500}
+                      placeholder="e.g. Missing business license / duplicate product…"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  <Button className="flex-1 gap-2 bg-brand-600 hover:bg-brand-700" onClick={handleApprove} disabled={acting}>
+                    {acting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Approve
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 gap-2 border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
+                    onClick={showRejectForm ? () => review('reject') : handleRejectClick}
+                    disabled={acting || (showRejectForm && !rejectReason.trim())}
+                  >
+                    {acting ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                    {showRejectForm ? 'Confirm reject' : 'Reject'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!isSuperAdmin && (
+              <p className="mt-5 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                <Mail className="h-3.5 w-3.5" /> Only a super admin can approve or reject submissions.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

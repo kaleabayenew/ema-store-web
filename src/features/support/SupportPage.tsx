@@ -5,7 +5,7 @@ import {
   Phone, User, ShoppingBag, Wallet, CalendarDays, X,
   ShieldOff, ShieldCheck, Plus, Trash2, Edit2, MessageSquareDashed,
   History, ChevronLeft, ChevronRight, Filter,
-  Check, CheckCheck, Bell, Paperclip, ImageIcon,
+  Check, CheckCheck, Paperclip,
 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { maxLength, required, validate } from '@/lib/validate'
 import api from '@/lib/api'
+import { apiErrorMessage } from '@/lib/errors'
 import { useAuthStore } from '@/store/authStore'
 import { useAlert, useConfirm } from '@/components/ui/ConfirmDialog'
 
@@ -132,10 +133,6 @@ interface StaffUser {
 const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'info' | 'default' | 'danger'> = {
   OPEN: 'warning', IN_PROGRESS: 'info', RESOLVED: 'success', CLOSED: 'default',
 }
-const PRIORITY_VARIANT: Record<string, 'danger' | 'warning' | 'info' | 'default'> = {
-  URGENT: 'danger', HIGH: 'danger', MEDIUM: 'warning', LOW: 'default',
-}
-
 function statusLabel(s: string) {
   const m: Record<string, string> = { OPEN: 'Open', IN_PROGRESS: 'In progress', RESOLVED: 'Resolved', CLOSED: 'Closed' }
   return m[s] ?? s
@@ -372,7 +369,7 @@ function ConversationHistoryTab({ onOpenTicket }: { onOpenTicket: (id: string) =
       title: 'Delete ticket',
       message: 'Are you sure you want to delete this ticket? This action cannot be undone.',
       confirmText: 'Delete',
-      confirmVariant: 'danger',
+      variant: 'danger',
     })
     if (!confirmed) return
 
@@ -671,7 +668,7 @@ export function SupportPage() {
 
   const fetchSettings = useCallback(async () => {
     try { const res = await api.get('/support/settings'); setSettings(res.data.data) }
-    catch (e) { console.error('Failed to fetch settings', e) }
+    catch (e) { console.error('Failed to fetch settings:', apiErrorMessage(e)) }
   }, [])
   useEffect(() => { fetchSettings() }, [fetchSettings])
 
@@ -686,7 +683,7 @@ export function SupportPage() {
   const fetchDefaultMsgs = useCallback(async () => {
     setDefaultMsgsLoading(true)
     try { const res = await api.get('/support/default-messages'); setDefaultMsgs(res.data.messages ?? []) }
-    catch (e) { console.error('Failed to fetch default messages', e) }
+    catch (e) { console.error('Failed to fetch default messages:', apiErrorMessage(e)) }
     finally { setDefaultMsgsLoading(false) }
   }, [])
   useEffect(() => { fetchDefaultMsgs() }, [fetchDefaultMsgs])
@@ -794,6 +791,8 @@ export function SupportPage() {
   function startTypingPoll(ticketId: string) {
     if (typingPollRef.current) clearInterval(typingPollRef.current)
     typingPollRef.current = setInterval(async () => {
+      // Pause polling while the tab is hidden
+      if (document.hidden) return
       // Stop if the user navigated away from this ticket
       if (openTicketIdRef.current !== ticketId) {
         if (typingPollRef.current) { clearInterval(typingPollRef.current); typingPollRef.current = null }
@@ -807,11 +806,8 @@ export function SupportPage() {
 
         // Fetch new messages to update the conversation
         const res = await api.get<{ ticket: TicketDetail }>(`/support/${ticketId}`)
-        console.log('🔄 Polling ticket:', ticketId, 'Messages:', res.data.ticket.messages.length)
         setSelected(res.data.ticket)
-      } catch (err) {
-        console.error('Polling error:', err)
-      }
+      } catch { /* transient polling errors are expected */ }
     }, 3000)
   }
 
@@ -916,15 +912,21 @@ export function SupportPage() {
       title: 'Delete tickets',
       message: `Are you sure you want to delete ${selectedTicketIds.size} ticket${selectedTicketIds.size > 1 ? 's' : ''}? This action cannot be undone.`,
       confirmText: 'Delete',
-      confirmVariant: 'danger',
+      variant: 'danger',
     })
     if (!confirmed) return
 
     try {
-      await Promise.all(Array.from(selectedTicketIds).map((id) => api.delete(`/support/${id}`)))
+      const ids = Array.from(selectedTicketIds)
+      const results = await Promise.allSettled(ids.map((id) => api.delete(`/support/${id}`)))
+      const failed = results.filter((r) => r.status === 'rejected').length
       setSelectedTicketIds(new Set())
       fetchTickets()
-      alert({ variant: 'success', message: 'Tickets deleted successfully' })
+      if (failed > 0) {
+        alert({ variant: 'error', message: `${ids.length - failed} ticket${ids.length - failed === 1 ? '' : 's'} deleted, ${failed} failed.` })
+      } else {
+        alert({ variant: 'success', message: 'Tickets deleted successfully' })
+      }
     } catch (err: any) {
       alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to delete tickets' })
     }
@@ -937,7 +939,7 @@ export function SupportPage() {
       title: 'Delete ticket',
       message: 'Are you sure you want to delete this ticket? This action cannot be undone.',
       confirmText: 'Delete',
-      confirmVariant: 'danger',
+      variant: 'danger',
     })
     if (!confirmed) return
 
@@ -958,7 +960,7 @@ export function SupportPage() {
       title: 'Close ticket',
       message: 'Are you sure you want to close this ticket?',
       confirmText: 'Close',
-      confirmVariant: 'warning',
+      variant: 'default',
     })
     if (!confirmed) return
 
@@ -1312,8 +1314,8 @@ export function SupportPage() {
                             <span>{formatTime(m.sentAt)}</span>
                             {m.isStaff && (
                               m.readAt
-                                ? <CheckCheck className="h-3 w-3" title={`Read ${timeAgo(m.readAt)}`} />
-                                : <Check className="h-3 w-3 opacity-80" title="Sent" />
+                                ? <CheckCheck className="h-3 w-3" aria-label={`Read ${timeAgo(m.readAt)}`} />
+                                : <Check className="h-3 w-3 opacity-80" aria-label="Sent" />
                             )}
                           </div>
                         </div>

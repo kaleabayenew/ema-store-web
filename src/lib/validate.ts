@@ -59,6 +59,35 @@ export function isPositive(value: string | number, field = 'Value'): ValidationE
   return n > 0 ? null : `${field} must be greater than 0.`
 }
 
+// ── Password policy ──────────────────────────────────────────────────────────
+
+export const PASSWORD_MIN_LENGTH = 12
+
+const COMMON_PASSWORDS = new Set([
+  'password', 'password1', 'password123', 'passw0rd', 'p@ssw0rd', 'qwerty123',
+  'welcome123', 'admin1234', 'letmein123', 'changeme123', 'iloveyou123',
+])
+
+export function passwordPolicy(value: string, field = 'Password'): ValidationError {
+  if (value.length < PASSWORD_MIN_LENGTH) {
+    return `${field} must be at least ${PASSWORD_MIN_LENGTH} characters.`
+  }
+  if (value.length > 72) {
+    return `${field} must be at most 72 characters.`
+  }
+  if (!/[a-zA-Z]/.test(value) || !/[0-9]/.test(value)) {
+    return `${field} must contain at least one letter and one number.`
+  }
+  if (COMMON_PASSWORDS.has(value.toLowerCase())) {
+    return `${field} is too common — choose something less guessable.`
+  }
+  return null
+}
+
+export function passwordsMatch(password: string, confirm: string): ValidationError {
+  return password === confirm ? null : 'Passwords do not match.'
+}
+
 export function isDate(value: string, field = 'Date'): ValidationError {
   return value && !Number.isNaN(new Date(value).getTime())
     ? null
@@ -101,12 +130,6 @@ export function hasErrors<T>(errors: FieldErrors<T>): boolean {
   return Object.values(errors).some(Boolean)
 }
 
-// ── Sanitise (strip dangerous HTML from string values before display) ─────────
-
-export function sanitiseText(value: string): string {
-  return value
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
+// NOTE: React already escapes text at render time — do NOT HTML-escape
+// strings before rendering or users will see literal entities like &lt;.
+// The old sanitiseText() helper was removed for that reason.

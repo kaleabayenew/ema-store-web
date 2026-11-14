@@ -4,23 +4,14 @@ import './index.css'
 import App from './App.tsx'
 import { api } from './lib/api'
 
-// Wake up the backend on startup
-const wakeBackend = async () => {
-  try {
-    await api.get('/health', { timeout: 5000 })
-  } catch (error) {
-    console.log('Backend health check failed or timed out, but continuing...')
-  }
-}
+// Render immediately — never block first paint on a backend health check.
+// The check runs in the background to warm up a sleeping Render instance.
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
 
-// Start the app
-const startApp = async () => {
-  await wakeBackend()
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  )
-}
-
-startApp()
+api.get('/health', { timeout: 5000 }).catch(() => {
+  // Backend may be asleep or unreachable — pages show their own errors.
+})

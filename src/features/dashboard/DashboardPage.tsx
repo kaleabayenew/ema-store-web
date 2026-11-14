@@ -261,7 +261,7 @@ export function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} />
                 <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
-                <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                <Tooltip formatter={(v) => formatCurrency(Number(v ?? 0))} />
                 <Area type="monotone" dataKey="revenue" stroke="#1B9B5A" fill="url(#revenue)" strokeWidth={3} />
               </AreaChart>
             </ResponsiveContainer>
@@ -286,7 +286,7 @@ export function DashboardPage() {
                     <Cell key={e.name} fill={STATUS_COLOR[e.name] ?? '#94a3b8'} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => [`${v} orders`, '']} />
+                <Tooltip formatter={(v) => [`${Number(v ?? 0)} orders`, '']} />
               </PieChart>
             </ResponsiveContainer>
           </div>

@@ -14,7 +14,7 @@ const productSchema = z.object({
   descriptionEn: z.string().min(10, 'Description must be at least 10 characters'),
   categoryId: z.string().min(1, 'Category is required'),
   brandId: z.string().optional(),
-  priceCents: z.number().min(100, 'Price must be at least 1 ETB'),
+  priceCents: z.number().min(100, 'Price must be at least 1 ETB').max(100_000_000, 'Price is too large'),
   discountCents: z.number().optional(),
   stock: z.number().min(0, 'Stock cannot be negative'),
   sku: z.string().optional(),
@@ -88,7 +88,18 @@ export function ProductForm({ initialData, categories, onSubmit, onCancel, isEdi
   // Handle image file selection
   const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      alert('Only image files are allowed.')
+      e.target.value = ''
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be 5 MB or smaller.')
+      e.target.value = ''
+      return
+    }
+    {
       setValue('imageFile', file)
       // Create preview
       const reader = new FileReader()

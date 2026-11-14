@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import api from '@/lib/api'
+import { useAuthStore } from '@/store/authStore'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -109,6 +110,8 @@ export function CustomersPage() {
   const alert = useAlert()
   const confirmDialog = useConfirm()
   const promptDialog = usePrompt()
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN'
   const [search, setSearch]   = useState('')
   const [filter, setFilter]   = useState<FilterStatus>('all')
   const [page, setPage]       = useState(1)
@@ -120,12 +123,6 @@ export function CustomersPage() {
   const [ordersCustomer, setOrdersCustomer] = useState<Customer | null>(null)
   const [orders, setOrders]                 = useState<Order[]>([])
   const [ordersLoading, setOrdersLoading]   = useState(false)
-
-  // PIN-gated password reveal (detail popup)
-  const [pwState, setPwState]       = useState<'locked' | 'verifying' | 'revealed' | 'hashed'>('locked')
-  const [pwPin, setPwPin]           = useState('')
-  const [pwPinError, setPwPinError] = useState('')
-  const [pwValue, setPwValue]       = useState<string | null>(null)
 
   // Reset password popup
   const [resetCustomer, setResetCustomer] = useState<Customer | null>(null)
@@ -148,37 +145,6 @@ export function CustomersPage() {
     }
   }
 
-  // Reset reveal state when the detail popup closes or changes customer
-  useEffect(() => {
-    setPwState('locked')
-    setPwPin('')
-    setPwPinError('')
-    setPwValue(null)
-  }, [selected])
-
-  // Reveal password behind a PIN
-  async function revealPassword() {
-    if (!selected) return
-    setPwPinError('')
-    setPwState('verifying')
-    try {
-      const res = await api.get<{ success: boolean; data: { password: string | null; hashed: boolean; phone: string } }>(
-        `/customers/${selected.id}/password`,
-        { params: { pin: pwPin } },
-      )
-      const d = res.data.data
-      if (d.hashed || !d.password) {
-        setPwState('hashed')
-      } else {
-        setPwValue(d.password)
-        setPwState('revealed')
-      }
-    } catch (err: any) {
-      setPwState('locked')
-      setPwPinError(err.response?.status === 403 ? 'Incorrect PIN' : 'Failed to load')
-    }
-  }
-
   // Open the reset password popup
   function openResetPassword(customer: Customer) {
     setResetCustomer(customer)
@@ -195,8 +161,6 @@ export function CustomersPage() {
       const res = await api.post<{ success: boolean; data: { newPassword: string; delivery: { sent: boolean; note: string } } }>(`/customers/${resetCustomer.id}/reset-password`)
       setResetNew(res.data.data.newPassword)
       setResetSent(res.data.data.delivery.sent)
-      // If the detail popup is open for the same customer, refresh its password too
-      if (selected?.id === resetCustomer.id) { setPwValue(res.data.data.newPassword); setPwState('revealed') }
       // Refresh the list so any derived state stays fresh
       fetchCustomers()
     } catch (err: any) {
@@ -443,7 +407,7 @@ export function CustomersPage() {
 
                     {/* Status */}
                     <td className="px-4 py-3">
-                      <Badge variant={!c.isBlocked && c.isActive ? 'success' : 'destructive'}>
+                      <Badge variant={!c.isBlocked && c.isActive ? 'success' : 'danger'}>
                         {!c.isBlocked && c.isActive ? 'Active' : 'Blocked'}
                       </Badge>
                     </td>
@@ -610,61 +574,12 @@ export function CustomersPage() {
                 </div>
               )}
 
-              {/* Password row (spans full width) — PIN-gated reveal */}
+              {/* Password row (spans full width) */}
               <div className="col-span-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-slate-400">Password</p>
-                  {pwState === 'revealed' && pwValue && (
-                    <button
-                      onClick={() => navigator.clipboard.writeText(pwValue)}
-                      className="text-xs text-brand-600 hover:underline dark:text-brand-400"
-                    >
-                      Copy
-                    </button>
-                  )}
-                </div>
-
-                {pwState === 'locked' && (
-                  <div className="mt-1 flex flex-col gap-2">
-                    <p className="font-mono text-sm font-semibold text-slate-500">•••••••• <span className="text-xs font-sans text-slate-400">(locked)</span></p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="password"
-                        inputMode="numeric"
-                        maxLength={6}
-                        placeholder="Enter PIN"
-                        value={pwPin}
-                        onChange={(e) => setPwPin(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') revealPassword() }}
-                        className="w-28 rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm outline-none focus:border-brand-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                      />
-                      <button
-                        onClick={revealPassword}
-                        disabled={!pwPin}
-                        className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-                      >
-                        Reveal
-                      </button>
-                    </div>
-                    {pwPinError && <p className="text-xs text-red-500">{pwPinError}</p>}
-                  </div>
-                )}
-
-                {pwState === 'verifying' && (
-                  <p className="mt-1 flex items-center gap-2 text-sm text-slate-400">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Verifying…
-                  </p>
-                )}
-
-                {pwState === 'revealed' && pwValue && (
-                  <p className="mt-1 font-mono text-sm font-semibold text-slate-800 dark:text-slate-100">{pwValue}</p>
-                )}
-
-                {pwState === 'hashed' && (
-                  <p className="mt-1 text-xs text-slate-500">
-                    Password is hashed and cannot be revealed. Use <span className="font-semibold">Reset password</span> to generate a new one.
-                  </p>
-                )}
+                <p className="text-xs text-slate-400">Password</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Password is hashed and cannot be revealed. Use <span className="font-semibold">Reset password</span> to generate a new one.
+                </p>
               </div>
             </div>
 
@@ -835,8 +750,8 @@ export function CustomersPage() {
                 </p>
               </div>
 
-              {/* New password (after generate) */}
-              {resetNew && (
+              {/* New password (after generate) — visible to admins only */}
+              {resetNew && isAdmin && (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-900/20">
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-emerald-700 dark:text-emerald-400">New password</p>
@@ -859,6 +774,16 @@ export function CustomersPage() {
                     ) : (
                       <span className="text-amber-600">Customer hasn't linked Telegram — password logged on server</span>
                     )}
+                  </div>
+                </div>
+              )}
+              {resetNew && !isAdmin && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-900/20">
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400">
+                    <Send className="h-3 w-3" />
+                    {resetSent
+                      ? 'A new password was generated and sent to the customer on Telegram.'
+                      : "A new password was generated. The customer hasn't linked Telegram — the password is logged on the server."}
                   </div>
                 </div>
               )}

@@ -4,11 +4,12 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { verifyOtp } from '@/services/authService'
 import { useAuthStore } from '@/store/authStore'
+import type { AuthSession } from '@/types/auth'
 
 export function OtpPage() {
   const navigate = useNavigate()
   const { pendingOtp, setSession, clearPendingOtp } = useAuthStore()
-  const [otp, setOtp] = useState('123456')
+  const [otp, setOtp] = useState('')
   const [error, setError] = useState('')
   const [isVerifying, setIsVerifying] = useState(false)
 
@@ -30,21 +31,29 @@ export function OtpPage() {
     try {
       const response = await verifyOtp({ otp, otpSessionId: pendingOtp.otpSessionId })
 
-      if (!response.ok) {
-        throw new Error('OTP verification failed')
+      // Fail closed: the backend must return a real session. Never
+      // fabricate tokens client-side.
+      const token = response?.token ?? response?.accessToken
+      const user = response?.user
+      if (!token || !user?.id) {
+        throw new Error('OTP verification did not return a session. Please sign in again.')
       }
 
-      const user = useAuthStore.getState().user
-      if (!user) {
-        throw new Error('User session not found')
-      }
-
-      setSession({
-        user,
-        accessToken: 'mock-access-token-verified',
-        refreshToken: 'mock-refresh-token-verified',
+      const session: AuthSession = {
+        user: {
+          id: user.id,
+          name: user.fullName ?? user.name ?? pendingOtp.email,
+          email: user.email ?? pendingOtp.email,
+          role: user.adminRole ?? user.role,
+          locale: 'en',
+          allowedPages: user.allowedPages ?? [],
+        },
+        accessToken: token,
+        refreshToken: response?.refreshToken ?? token,
         expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 8).toISOString(),
-      })
+      }
+
+      setSession(session)
       clearPendingOtp()
       navigate('/dashboard')
     } catch (err) {
@@ -58,6 +67,7 @@ export function OtpPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10 dark:bg-slate-950">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-soft dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-6 text-center">
+          <img src="/image/logo_full.svg" alt="Ema Store" className="mx-auto mb-4 h-12 w-auto" />
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Two-factor authentication</h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Enter the 6-digit code sent to {pendingOtp.email}</p>
         </div>
@@ -74,13 +84,14 @@ export function OtpPage() {
               maxLength={6}
               value={otp}
               onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+              autoComplete="one-time-code"
               className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-center text-lg font-semibold tracking-[0.3em] text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
             />
           </div>
 
           {error && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">{error}</div>}
 
-          <Button type="submit" className="w-full" disabled={isVerifying}>
+          <Button type="submit" className="w-full" disabled={isVerifying || otp.length !== 6}>
             {isVerifying ? 'Verifying...' : 'Verify code'}
           </Button>
         </form>
