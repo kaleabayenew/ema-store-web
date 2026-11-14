@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+
+  <!-- ── Green rounded square background ── -->
+  <rect x="0" y="0" width="1024" height="1024" rx="220" ry="220" fill="#2BAE66"/>
+
+  <!-- ── Gold padlock shackle (thick rounded arc) ── -->
+  <!-- Outer arc -->
+  <path d="M512 155
+           C368 155 270 258 270 390
+           L270 490"
+        stroke="#F5A623" stroke-width="88" stroke-linecap="round" fill="none"/>
+  <path d="M512 155
+           C656 155 754 258 754 390
+           L754 490"
+        stroke="#F5A623" stroke-width="88" stroke-linecap="round" fill="none"/>
+
+  <!-- ── White padlock body ── -->
+  <rect x="220" y="460" width="584" height="430" rx="80" ry="80" fill="white"/>
+
+  <!-- ── Green "E" letter — slab style matching the logo ── -->
+  <!-- Top horizontal bar -->
+  <rect x="294" y="520" width="360" height="72" rx="12" ry="12" fill="#2BAE66"/>
+  <!-- Vertical bar -->
+  <rect x="294" y="520" width="80" height="310" rx="12" ry="12" fill="#2BAE66"/>
+  <!-- Middle horizontal bar (slightly shorter) -->
+  <rect x="294" y="629" width="300" height="62" rx="12" ry="12" fill="#2BAE66"/>
+  <!-- Bottom horizontal bar -->
+  <rect x="294" y="758" width="360" height="72" rx="12" ry="12" fill="#2BAE66"/>
+
+</svg>

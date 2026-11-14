@@ -17,7 +17,8 @@ export default defineConfig({
   preview: {
     port: 4173,
     host: '0.0.0.0',
-    allowedHosts: ['ema-store-web.onrender.com', '.onrender.com'],
+    // Exact host only — '.onrender.com' would accept ANY Render subdomain.
+    allowedHosts: ['ema-store-web.onrender.com'],
   },
   build: {
     rollupOptions: {

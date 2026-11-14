@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180" width="640" height="180">
+
+  <!-- ── Icon mark (left) 160×160 ── -->
+  <rect x="0" y="10" width="160" height="160" rx="34" ry="34" fill="#2BAE66"/>
+
+  <!-- Gold shackle -->
+  <path d="M80 30 C54 30 38 50 38 72 L38 88"
+        stroke="#F5A623" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <path d="M80 30 C106 30 122 50 122 72 L122 88"
+        stroke="#F5A623" stroke-width="14" stroke-linecap="round" fill="none"/>
+
+  <!-- White body -->
+  <rect x="32" y="82" width="96" height="72" rx="14" ry="14" fill="white"/>
+
+  <!-- Green E (slab bars) -->
+  <!-- Top bar -->
+  <rect x="48" y="92" width="62" height="11" rx="3" fill="#2BAE66"/>
+  <!-- Vertical stem -->
+  <rect x="48" y="92" width="13" height="52" rx="3" fill="#2BAE66"/>
+  <!-- Middle bar -->
+  <rect x="48" y="112" width="50" height="11" rx="3" fill="#2BAE66"/>
+  <!-- Bottom bar -->
+  <rect x="48" y="133" width="62" height="11" rx="3" fill="#2BAE66"/>
+
+  <!-- ── Text lockup ── -->
+  <!-- "ema" green bold -->
+  <text x="180" y="105"
+        font-family="'Arial Black', Arial, sans-serif"
+        font-size="68" font-weight="900"
+        fill="#2BAE66">ema</text>
+
+  <!-- "store" dark regular -->
+  <text x="355" y="105"
+        font-family="Arial, sans-serif"
+        font-size="68" font-weight="300"
+        fill="#1A2520"> store</text>
+
+  <!-- Amharic in gold -->
+  <text x="180" y="148"
+        font-family="'Noto Sans Ethiopic', Arial, sans-serif"
+        font-size="30" font-weight="600"
+        fill="#F5A623">እማ ስቶር</text>
+
+</svg>
