@@ -29,6 +29,8 @@ interface Product {
   ratingCount: number
   soldCount: number
   primaryImageUrl: string | null
+  images?: Array<{ url?: string; image_url?: string; is_primary?: boolean; isPrimary?: boolean } | string>
+  imageUrls?: string[]
   categoryName: string | null
   categorySlug: string | null
   partnerName: string | null
@@ -160,20 +162,36 @@ export function ProductsPage() {
     }
   }
 
+  const resolveFinalImages = async (data: any): Promise<string[]> => {
+    const finalUrls: string[] = []
+    if (Array.isArray(data.imageItems) && data.imageItems.length > 0) {
+      for (const item of data.imageItems) {
+        if (item.file) {
+          const uploaded = await uploadProductImage(item.file)
+          if (uploaded) finalUrls.push(uploaded)
+        } else if (item.url) {
+          finalUrls.push(item.url)
+        }
+      }
+    } else if (data.imageMethod === 'file' && data.imageFile) {
+      const uploaded = await uploadProductImage(data.imageFile)
+      if (uploaded) finalUrls.push(uploaded)
+    } else if (data.imageUrl) {
+      finalUrls.push(data.imageUrl)
+    }
+    return finalUrls
+  }
+
   const handleCreateProduct = async (data: any) => {
     try {
-      let imageUrl = data.imageUrl
-      if (data.imageMethod === 'file' && data.imageFile) {
-        const uploaded = await uploadProductImage(data.imageFile)
-        if (!uploaded) return
-        imageUrl = uploaded
-      }
+      const finalImageUrls = await resolveFinalImages(data)
 
       await api.post('/products', {
         ...data,
         priceCents: Math.round(data.priceCents * 100),
         discountCents: data.discountCents ? Math.round(data.discountCents * 100) : undefined,
-        images: imageUrl ? [{ url: imageUrl, isPrimary: true }] : [],
+        images: finalImageUrls.map((url, i) => ({ url, isPrimary: i === 0 })),
+        imageUrls: finalImageUrls,
       })
       setShowAddDialog(false)
       fetchProducts()
@@ -185,18 +203,14 @@ export function ProductsPage() {
   const handleUpdateProduct = async (data: any) => {
     if (!selectedProduct) return
     try {
-      let imageUrl = data.imageUrl
-      if (data.imageMethod === 'file' && data.imageFile) {
-        const uploaded = await uploadProductImage(data.imageFile)
-        if (!uploaded) return
-        imageUrl = uploaded
-      }
+      const finalImageUrls = await resolveFinalImages(data)
 
       await api.patch(`/products/${selectedProduct.id}`, {
         ...data,
         priceCents: Math.round(data.priceCents * 100),
         discountCents: data.discountCents ? Math.round(data.discountCents * 100) : undefined,
-        images: imageUrl ? [{ url: imageUrl, isPrimary: true }] : undefined,
+        images: finalImageUrls.length > 0 ? finalImageUrls.map((url, i) => ({ url, isPrimary: i === 0 })) : undefined,
+        imageUrls: finalImageUrls.length > 0 ? finalImageUrls : undefined,
       })
       setShowEditDialog(false)
       setSelectedProduct(null)
@@ -501,6 +515,8 @@ export function ProductsPage() {
                 sku: selectedProduct.sku ?? '',
                 deliveryInfo: selectedProduct.deliveryInfo ?? '',
                 imageUrl: selectedProduct.primaryImageUrl ?? '',
+                images: selectedProduct.images,
+                imageUrls: selectedProduct.imageUrls,
                 status: selectedProduct.status as 'PENDING' | 'APPROVED' | 'REJECTED',
               }}
               categories={categories}
@@ -528,9 +544,20 @@ export function ProductsPage() {
                 {viewingProduct.status ? viewingProduct.status.charAt(0) + viewingProduct.status.slice(1).toLowerCase() : '—'}
               </Badge>
             </div>
-            {viewingProduct.primaryImageUrl && (
+            {viewingProduct.imageUrls && viewingProduct.imageUrls.length > 1 ? (
+              <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+                {viewingProduct.imageUrls.map((url, i) => (
+                  <img
+                    key={i}
+                    src={url}
+                    alt={`${viewingProduct.nameEn} ${i + 1}`}
+                    className="h-24 w-24 rounded-xl border border-slate-200 dark:border-slate-700 object-cover flex-shrink-0"
+                  />
+                ))}
+              </div>
+            ) : viewingProduct.primaryImageUrl ? (
               <img src={viewingProduct.primaryImageUrl} alt={viewingProduct.nameEn} className="mb-4 h-40 w-full rounded-xl object-cover" />
-            )}
+            ) : null}
             <div className="grid grid-cols-2 gap-3 text-sm">
               {[
                 { label: 'Category', value: viewingProduct.categoryName ?? '—' },

@@ -2,12 +2,21 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { Plus, X, Star, Upload, Link as LinkIcon, Image as ImageIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+export interface ImageItem {
+  id: string
+  url?: string
+  file?: File
+  preview: string
+  isPrimary: boolean
+}
 
 const productSchema = z.object({
   nameEn: z.string().min(3, 'Name must be at least 3 characters'),
@@ -19,16 +28,20 @@ const productSchema = z.object({
   stock: z.number().min(0, 'Stock cannot be negative'),
   sku: z.string().optional(),
   deliveryInfo: z.string().optional(),
-  imageUrl: z.string().url('Must be a valid URL').optional(),
-  imageFile: z.any().optional(),
-  imageMethod: z.enum(['url', 'file']),
+  imageUrl: z.string().optional(),
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED']),
 })
 
-type ProductFormData = z.infer<typeof productSchema>
+export type ProductFormData = z.infer<typeof productSchema> & {
+  imageItems?: ImageItem[]
+  imageUrls?: string[]
+}
 
 interface ProductFormProps {
-  initialData?: Partial<ProductFormData>
+  initialData?: Partial<ProductFormData> & {
+    images?: Array<{ url?: string; image_url?: string; isPrimary?: boolean; is_primary?: boolean } | string>
+    imageUrls?: string[]
+  }
   categories: Array<{ id: string; name_en: string }>
   onSubmit: (data: ProductFormData) => Promise<void>
   onCancel: () => void
@@ -45,9 +58,40 @@ function generateSKU(name: string, categoryId: string): string {
 
 export function ProductForm({ initialData, categories, onSubmit, onCancel, isEditing = false }: ProductFormProps) {
   const [loading, setLoading] = useState(false)
-  const [imageMethod, setImageMethod] = useState<'url' | 'file'>('url')
-  const [imagePreview, setImagePreview] = useState<string | null>(initialData?.imageUrl || null)
+  const [urlInput, setUrlInput] = useState('')
   const [autoGenerateSKU, setAutoGenerateSKU] = useState(!isEditing)
+
+  // Initialize multiple images from initialData
+  const [images, setImages] = useState<ImageItem[]>(() => {
+    const list: ImageItem[] = []
+    const rawUrls: string[] = []
+
+    if (Array.isArray(initialData?.imageUrls) && initialData.imageUrls.length > 0) {
+      rawUrls.push(...initialData.imageUrls)
+    } else if (Array.isArray(initialData?.images) && initialData.images.length > 0) {
+      for (const item of initialData.images) {
+        if (typeof item === 'string') {
+          rawUrls.push(item)
+        } else if (item && typeof item === 'object') {
+          const u = item.url || item.image_url
+          if (u) rawUrls.push(u)
+        }
+      }
+    } else if (initialData?.imageUrl) {
+      rawUrls.push(initialData.imageUrl)
+    }
+
+    rawUrls.filter(Boolean).slice(0, 5).forEach((url, i) => {
+      list.push({
+        id: `img_${i}_${Date.now()}`,
+        url,
+        preview: url,
+        isPrimary: i === 0,
+      })
+    })
+
+    return list
+  })
 
   const {
     register,
@@ -55,22 +99,20 @@ export function ProductForm({ initialData, categories, onSubmit, onCancel, isEdi
     formState: { errors },
     setValue,
     watch,
-  } = useForm<ProductFormData>({
+  } = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
-    defaultValues: initialData || {
-      nameEn: '',
-      descriptionEn: '',
-      categoryId: '',
-      brandId: '',
-      priceCents: 0,
-      discountCents: undefined,
-      stock: 0,
-      sku: '',
-      deliveryInfo: '',
-      imageUrl: '',
-      imageFile: undefined,
-      imageMethod: 'url',
-      status: 'PENDING',
+    defaultValues: {
+      nameEn: initialData?.nameEn || '',
+      descriptionEn: initialData?.descriptionEn || '',
+      categoryId: initialData?.categoryId || '',
+      brandId: initialData?.brandId || '',
+      priceCents: initialData?.priceCents || 0,
+      discountCents: initialData?.discountCents,
+      stock: initialData?.stock || 0,
+      sku: initialData?.sku || '',
+      deliveryInfo: initialData?.deliveryInfo || '',
+      imageUrl: initialData?.imageUrl || '',
+      status: initialData?.status || 'PENDING',
     },
   })
 
@@ -85,42 +127,118 @@ export function ProductForm({ initialData, categories, onSubmit, onCancel, isEdi
     }
   }
 
-  // Handle image file selection
-  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (!file.type.startsWith('image/')) {
-      alert('Only image files are allowed.')
+  // Handle multiple image file selection (up to 5)
+  const handleImageFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const remaining = 5 - images.length
+    if (remaining <= 0) {
+      alert('Maximum 5 images allowed per product.')
       e.target.value = ''
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Image must be 5 MB or smaller.')
-      e.target.value = ''
-      return
-    }
-    {
-      setValue('imageFile', file)
-      // Create preview
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string)
+
+    const filesToAdd = files.slice(0, remaining)
+    const newItems: ImageItem[] = []
+
+    for (const file of filesToAdd) {
+      if (!file.type.startsWith('image/')) {
+        alert(`${file.name} is not an image file.`)
+        continue
       }
-      reader.readAsDataURL(file)
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`${file.name} exceeds the 5 MB limit.`)
+        continue
+      }
+
+      const preview = URL.createObjectURL(file)
+      newItems.push({
+        id: `file_${Date.now()}_${Math.random()}`,
+        file,
+        preview,
+        isPrimary: images.length === 0 && newItems.length === 0,
+      })
     }
+
+    if (newItems.length > 0) {
+      setImages(prev => {
+        const updated = [...prev, ...newItems].slice(0, 5)
+        if (updated.length > 0 && !updated.some(x => x.isPrimary)) {
+          updated[0].isPrimary = true
+        }
+        return updated
+      })
+    }
+
+    e.target.value = ''
   }
 
-  // Handle image URL change
-  const handleImageUrl = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const url = e.target.value
-    setValue('imageUrl', url)
-    setImagePreview(url || null)
+  // Handle adding image via URL
+  const handleAddUrl = () => {
+    const trimmed = urlInput.trim()
+    if (!trimmed) return
+    if (images.length >= 5) {
+      alert('Maximum 5 images allowed.')
+      return
+    }
+
+    try {
+      new URL(trimmed)
+    } catch {
+      alert('Please enter a valid URL starting with http:// or https://')
+      return
+    }
+
+    setImages(prev => {
+      const updated = [
+        ...prev,
+        {
+          id: `url_${Date.now()}_${Math.random()}`,
+          url: trimmed,
+          preview: trimmed,
+          isPrimary: prev.length === 0,
+        },
+      ]
+      return updated
+    })
+    setUrlInput('')
   }
 
-  const onFormSubmit = async (data: ProductFormData) => {
+  // Set primary cover photo
+  const handleSetPrimary = (index: number) => {
+    setImages(prev =>
+      prev.map((item, idx) => ({
+        ...item,
+        isPrimary: idx === index,
+      }))
+    )
+  }
+
+  // Remove photo from list
+  const handleRemoveImage = (index: number) => {
+    setImages(prev => {
+      const updated = prev.filter((_, idx) => idx !== index)
+      if (updated.length > 0 && !updated.some(x => x.isPrimary)) {
+        updated[0].isPrimary = true
+      }
+      return updated
+    })
+  }
+
+  const onFormSubmit = async (data: z.infer<typeof productSchema>) => {
     setLoading(true)
     try {
-      await onSubmit(data)
+      // Re-order so primary image is first
+      const sorted = [...images].sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0))
+      const primaryItem = sorted[0]
+
+      await onSubmit({
+        ...data,
+        imageItems: sorted,
+        imageUrls: sorted.map(i => i.url).filter(Boolean) as string[],
+        imageUrl: primaryItem?.url || '',
+      })
     } finally {
       setLoading(false)
     }
@@ -155,10 +273,13 @@ export function ProductForm({ initialData, categories, onSubmit, onCancel, isEdi
       {/* Category */}
       <div className="space-y-2">
         <Label htmlFor="categoryId">Category *</Label>
-        <Select onValueChange={(value) => {
-          setValue('categoryId', value)
-          handleAutoGenerateSKU()
-        }} defaultValue={initialData?.categoryId}>
+        <Select
+          onValueChange={(value) => {
+            setValue('categoryId', value)
+            handleAutoGenerateSKU()
+          }}
+          defaultValue={initialData?.categoryId}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Select a category" />
           </SelectTrigger>
@@ -213,12 +334,12 @@ export function ProductForm({ initialData, categories, onSubmit, onCancel, isEdi
         <div className="flex items-center gap-2">
           <Label htmlFor="sku">SKU</Label>
           {!isEditing && (
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
               <input
                 type="checkbox"
                 checked={autoGenerateSKU}
                 onChange={(e) => setAutoGenerateSKU(e.target.checked)}
-                className="rounded"
+                className="rounded accent-green-600"
               />
               Auto-generate
             </label>
@@ -230,7 +351,7 @@ export function ProductForm({ initialData, categories, onSubmit, onCancel, isEdi
             placeholder="PROD-001"
             {...register('sku')}
             disabled={autoGenerateSKU && !isEditing}
-            className={autoGenerateSKU && !isEditing ? 'bg-gray-100' : ''}
+            className={autoGenerateSKU && !isEditing ? 'bg-gray-100 dark:bg-slate-800' : ''}
           />
           {!isEditing && (
             <Button
@@ -252,70 +373,127 @@ export function ProductForm({ initialData, categories, onSubmit, onCancel, isEdi
         <Label htmlFor="brandId">Brand</Label>
         <Input
           id="brandId"
-          placeholder="Brand ID"
+          placeholder="Brand ID / Name"
           {...register('brandId')}
         />
       </div>
 
-      {/* Image Upload Method */}
-      <div className="space-y-2">
-        <Label>Product Image *</Label>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              value="url"
-              checked={imageMethod === 'url'}
-              onChange={() => setImageMethod('url')}
-              className="accent-green-600"
-            />
-            <span>From URL</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              value="file"
-              checked={imageMethod === 'file'}
-              onChange={() => setImageMethod('file')}
-              className="accent-green-600"
-            />
-            <span>Upload File</span>
-          </label>
+      {/* ── Multi-Image Upload Manager (Up to 5 Photos) ── */}
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ImageIcon className="h-4 w-4 text-green-600" />
+            <Label className="font-semibold text-slate-900 dark:text-slate-100">
+              Product Photos ({images.length}/5)
+            </Label>
+          </div>
+          <span className="text-xs text-slate-500">
+            {images.length === 0 ? 'Upload up to 5 photos' : 'Tap star to set cover image'}
+          </span>
         </div>
 
-        {imageMethod === 'url' ? (
-          <div className="space-y-2">
-            <Input
-              id="imageUrl"
-              type="url"
-              placeholder="https://example.com/image.jpg"
-              {...register('imageUrl')}
-              onChange={handleImageUrl}
-            />
-            {errors.imageUrl && <p className="text-sm text-red-600">{errors.imageUrl.message}</p>}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <Input
-              id="imageFile"
-              type="file"
-              accept="image/*"
-              {...register('imageFile')}
-              onChange={handleImageFile}
-            />
-            <p className="text-xs text-gray-500">Supported formats: JPG, PNG, GIF, WebP (Max 5MB)</p>
+        {/* Existing & Picked Image Thumbnails */}
+        {images.length > 0 && (
+          <div className="grid grid-cols-5 gap-3">
+            {images.map((img, idx) => (
+              <div
+                key={img.id}
+                className={`relative group aspect-square rounded-xl border-2 overflow-hidden bg-slate-100 dark:bg-slate-800 ${img.isPrimary
+                    ? 'border-green-600 ring-2 ring-green-600/30'
+                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-400'
+                  }`}
+              >
+                <img
+                  src={img.preview}
+                  alt={`Product photo ${idx + 1}`}
+                  className="h-full w-full object-cover"
+                />
+
+                {/* Primary Cover Badge */}
+                {img.isPrimary && (
+                  <div className="absolute top-1 left-1 flex items-center gap-0.5 rounded-md bg-green-600 px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
+                    <Star className="h-2.5 w-2.5 fill-current" />
+                    Cover
+                  </div>
+                )}
+
+                {/* Make Primary Button (if not primary) */}
+                {!img.isPrimary && (
+                  <button
+                    type="button"
+                    onClick={() => handleSetPrimary(idx)}
+                    title="Set as Cover Photo"
+                    className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white hover:bg-black/80"
+                  >
+                    Set Cover
+                  </button>
+                )}
+
+                {/* Delete Button */}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveImage(idx)}
+                  title="Remove photo"
+                  className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-600 text-white flex items-center justify-center shadow opacity-90 hover:opacity-100 hover:scale-110 transition-all"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Image Preview */}
-        {imagePreview && (
-          <div className="mt-2">
-            <p className="text-sm font-medium mb-1">Preview:</p>
-            <img
-              src={imagePreview}
-              alt="Product preview"
-              className="w-32 h-32 object-cover rounded-lg border"
-            />
+        {/* Upload & Add URL Controls (if under 5 images) */}
+        {images.length < 5 && (
+          <div className="space-y-2 pt-1">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* File upload button */}
+              <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-green-600 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100 dark:border-green-700 dark:bg-green-950/40 dark:text-green-300">
+                <Upload className="h-3.5 w-3.5" />
+                <span>Upload Photos ({5 - images.length} remaining)</span>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleImageFiles}
+                  className="hidden"
+                />
+              </label>
+
+              <span className="text-xs text-slate-400">or</span>
+
+              {/* URL Input */}
+              <div className="flex flex-1 items-center gap-1.5 min-w-[200px]">
+                <div className="relative flex-1">
+                  <LinkIcon className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    type="url"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    placeholder="https://example.com/photo.jpg"
+                    className="h-8 pl-8 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleAddUrl()
+                      }
+                    }}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAddUrl}
+                  className="h-8 text-xs"
+                >
+                  <Plus className="mr-1 h-3 w-3" /> Add URL
+                </Button>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Supported: JPG, PNG, WebP (Max 5 MB each). The first photo is the primary cover image.
+            </p>
           </div>
         )}
       </div>
@@ -335,7 +513,10 @@ export function ProductForm({ initialData, categories, onSubmit, onCancel, isEdi
       {isEditing && (
         <div className="space-y-2">
           <Label htmlFor="status">Status</Label>
-          <Select onValueChange={(value) => setValue('status', value as 'PENDING' | 'APPROVED' | 'REJECTED')} defaultValue={initialData?.status}>
+          <Select
+            onValueChange={(value) => setValue('status', value as 'PENDING' | 'APPROVED' | 'REJECTED')}
+            defaultValue={initialData?.status}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select status" />
             </SelectTrigger>
