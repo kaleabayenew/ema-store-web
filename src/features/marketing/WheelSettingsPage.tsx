@@ -21,6 +21,27 @@ interface WheelSlice {
 
 // ── Wheel Settings Page ───────────────────────────────────────────────────────
 
+// Scale weights so they always sum to exactly 100 (percentages).
+function normalizeWeights(list: WheelSlice[]): WheelSlice[] {
+  if (list.length === 0) return list
+  const total = list.reduce((a, s) => a + (s.probabilityWeight || 0), 0)
+  if (total <= 0) {
+    const even = Math.floor(100 / list.length)
+    let leftover = 100 - even * list.length
+    return list.map((s) => {
+      const w = even + (leftover > 0 ? 1 : 0)
+      leftover = Math.max(0, leftover - 1)
+      return { ...s, probabilityWeight: w }
+    })
+  }
+  let assigned = 0
+  return list.map((s, i) => {
+    const w = i === list.length - 1 ? 100 - assigned : Math.round((s.probabilityWeight / total) * 100)
+    assigned += w
+    return { ...s, probabilityWeight: Math.max(0, w) }
+  })
+}
+
 export function WheelSettingsPage() {
   const [slices, setSlices] = useState<WheelSlice[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,7 +59,7 @@ export function WheelSettingsPage() {
     setError(null)
     try {
       const res = await api.get('/marketing/admin/wheel-config')
-      const loaded: WheelSlice[] = res.data.slices ?? []
+      const loaded: WheelSlice[] = normalizeWeights(res.data.slices ?? [])
       setSlices(loaded)
       setActiveTab((t) => Math.min(t, Math.max(0, loaded.length - 1)))
     } catch (err: any) {
@@ -56,6 +77,47 @@ export function WheelSettingsPage() {
     setSlices(updated)
   }
 
+  // Keep every slice weight as a percentage so the total is always exactly 100.
+  // Editing one slice redistributes the difference across the others.
+  const setSliceWeight = (index: number, raw: number) => {
+    const requested = Math.max(0, Math.min(100, Math.round(raw) || 0))
+    const others = slices.filter((_, i) => i !== index)
+    const otherSum = others.reduce((a, s) => a + s.probabilityWeight, 0)
+
+    // This slice can never take more than 100 minus what the others already hold.
+    const value = Math.min(requested, Math.max(0, 100 - otherSum))
+    const remaining = 100 - value
+
+    const updated = slices.map((s) => ({ ...s }))
+    updated[index] = { ...updated[index], probabilityWeight: value }
+
+    if (others.length === 0) {
+      updated[index] = { ...updated[index], probabilityWeight: 100 }
+    } else if (otherSum > 0) {
+      // Scale others proportionally to absorb `remaining`.
+      let assigned = 0
+      others.forEach((s, k) => {
+        const i = slices.indexOf(s)
+        const share = k === others.length - 1
+          ? remaining - assigned
+          : Math.round((remaining * s.probabilityWeight) / otherSum)
+        assigned += share
+        updated[i] = { ...updated[i], probabilityWeight: Math.max(0, share) }
+      })
+    } else {
+      // Others all at 0 — split evenly.
+      const even = Math.floor(remaining / others.length)
+      let leftover = remaining - even * others.length
+      others.forEach((s) => {
+        const i = slices.indexOf(s)
+        const w = even + (leftover > 0 ? 1 : 0)
+        leftover = Math.max(0, leftover - 1)
+        updated[i] = { ...updated[i], probabilityWeight: w }
+      })
+    }
+    setSlices(updated)
+  }
+
   const addSlice = () => {
     const slice: WheelSlice = {
       id: nextTempId.current--,
@@ -67,12 +129,13 @@ export function WheelSettingsPage() {
       colorHex: WHEEL_COLORS[slices.length % WHEEL_COLORS.length],
       isActive: true,
     }
-    setSlices([...slices, slice])
+    // Rebalance so the total stays at 100%.
+    setSlices(normalizeWeights([...slices, slice]))
     setActiveTab(slices.length)
   }
 
   const removeSlice = (index: number) => {
-    const updated = slices.filter((_, i) => i !== index)
+    const updated = normalizeWeights(slices.filter((_, i) => i !== index))
     setSlices(updated)
     setActiveTab((t) => Math.min(t, Math.max(0, updated.length - 1)))
   }
@@ -187,7 +250,7 @@ export function WheelSettingsPage() {
             </svg>
           </div>
           <div className="mt-4 text-center text-sm text-slate-500">
-            Total probability weight: {totalWeight}
+            Total probability: {totalWeight}% {totalWeight === 100 ? '✓' : '(must be 100)'}
           </div>
         </div>
 
@@ -243,6 +306,9 @@ export function WheelSettingsPage() {
                       />
                       <span className="max-w-[90px] truncate">
                         {slice.label || `Slice ${index + 1}`}
+                      </span>
+                      <span className="text-[10px] font-semibold text-brand-600 dark:text-brand-400">
+                        {slice.probabilityWeight}%
                       </span>
                       <span className="text-[10px] text-slate-400">{index + 1}</span>
                     </button>
@@ -330,13 +396,18 @@ export function WheelSettingsPage() {
                             />
                           </div>
                           <div>
-                            <Label className="text-xs">Probability Weight</Label>
+                            <Label className="text-xs">Probability (%)</Label>
                             <Input
                               type="number"
+                              min={0}
+                              max={100}
                               value={slice.probabilityWeight}
-                              onChange={(e) => updateSlice(index, 'probabilityWeight', parseInt(e.target.value) || 0)}
+                              onChange={(e) => setSliceWeight(index, parseInt(e.target.value) || 0)}
                               className="mt-1"
                             />
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              All slices must total 100% — others adjust automatically.
+                            </p>
                           </div>
                           <div className="sm:col-span-2">
                             <Label className="text-xs">Color</Label>
