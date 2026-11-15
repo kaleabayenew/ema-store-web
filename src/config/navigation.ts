@@ -1,7 +1,7 @@
 import {
   BarChart3, Bell, Bike, Boxes, Building2, CreditCard, FileText, Flame, Gavel,
   Image, Inbox, Info, LayoutDashboard, Megaphone, MessageSquareText, PackageCheck, Plug, Star,
-  Settings, ShoppingCart, Sparkles, UserRoundCog, Users, Wallet, Warehouse,
+  Settings, ShoppingCart, Sparkles, Sun, UserRoundCog, Users, Wallet, Warehouse,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -25,6 +25,7 @@ export const navGroups: { title: string; items: NavItem[] }[] = [
       { title: 'Ride',       href: '/ride',      icon: Bike },
       { title: 'Marketing',  href: '/marketing', icon: Sparkles },
       { title: 'Flash Deals', href: '/flash-deals', icon: Flame },
+      { title: 'Seasonal Promos', href: '/seasonal-promotions', icon: Sun },
       { title: 'Bid Control', href: '/bids',        icon: Gavel },
       { title: 'Support',    href: '/support',   icon: MessageSquareText },
       { title: 'Reviews',    href: '/reviews',   icon: Star },

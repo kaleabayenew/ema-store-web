@@ -32,6 +32,7 @@ import { ProductsPage } from './features/products/ProductsPage'
 import { ReportsPage } from './features/reports/ReportsPage'
 import { ReviewsPage } from './features/reviews/ReviewsPage'
 import { RidePage } from './features/ride/RidePage'
+import { SeasonalPromotionsPage } from './features/seasonal-promotions/SeasonalPromotionsPage'
 import { NotFoundPage } from './features/shared/NotFoundPage'
 import { SettingsPage } from './features/settings/SettingsPage'
 import { SupportPage } from './features/support/SupportPage'
@@ -90,6 +91,7 @@ function App() {
             <Route path="/ride"      element={<RidePage />} />
             <Route path="/marketing" element={<MarketingPage />} />
             <Route path="/flash-deals" element={<FlashDealsPage />} />
+            <Route path="/seasonal-promotions" element={<SeasonalPromotionsPage />} />
             <Route path="/bids" element={<BidControlPage />} />
             <Route path="/support"   element={<SupportPage />} />
             <Route path="/delivery"  element={<DeliveryPage />} />

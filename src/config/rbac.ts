@@ -34,7 +34,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   '/feedback': ['SUPER_ADMIN', 'MANAGEMENT', 'CUSTOMER_SUPPORT'],
   '/recently-viewed': ['SUPER_ADMIN'],
   '/new-arrivals': ['SUPER_ADMIN'],
-  '/seasonal-promotions': ['SUPER_ADMIN'],
+  '/seasonal-promotions': ['SUPER_ADMIN', 'MANAGEMENT', 'MARKETING'],
   '/top-rated': ['SUPER_ADMIN'],
   '/special-offers': ['SUPER_ADMIN'],
   '/about': ['SUPER_ADMIN'],
@@ -47,13 +47,13 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
 export const ROLE_PERMISSIONS: Record<Role, string[]> = {
   SUPER_ADMIN: ['*'],
   ADMIN: ['*'],
-  MANAGEMENT: ['dashboard', 'customers', 'partners', 'products', 'orders', 'ride', 'marketing', 'flash-deals', 'banners', 'notifications', 'support'],
-  MANAGER: ['dashboard', 'customers', 'partners', 'products', 'orders', 'ride', 'marketing', 'flash-deals', 'banners', 'notifications', 'support'],
+  MANAGEMENT: ['dashboard', 'customers', 'partners', 'products', 'orders', 'ride', 'marketing', 'flash-deals', 'seasonal-promotions', 'banners', 'notifications', 'support'],
+  MANAGER: ['dashboard', 'customers', 'partners', 'products', 'orders', 'ride', 'marketing', 'flash-deals', 'seasonal-promotions', 'banners', 'notifications', 'support'],
   CUSTOMER_SUPPORT: ['dashboard', 'customers', 'support'],
   PARTNER_MANAGER: ['dashboard', 'partners', 'reports', 'approvals'],
   PRODUCT_MANAGER: ['dashboard', 'products', 'orders', 'reports', 'approvals'],
   FINANCE: ['dashboard', 'orders', 'finance', 'reports'],
-  MARKETING: ['dashboard', 'marketing', 'flash-deals', 'banners', 'notifications'],
+  MARKETING: ['dashboard', 'marketing', 'flash-deals', 'seasonal-promotions', 'banners', 'notifications'],
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
