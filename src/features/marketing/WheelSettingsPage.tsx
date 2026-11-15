@@ -78,31 +78,33 @@ export function WheelSettingsPage() {
   }
 
   // Keep every slice weight as a percentage so the total is always exactly 100.
-  // Editing one slice redistributes the difference across the others.
+  // Editing one slice redistributes the difference across the others — the
+  // others scale down/up to make room, so any value 0–100 is allowed.
   const setSliceWeight = (index: number, raw: number) => {
-    const requested = Math.max(0, Math.min(100, Math.round(raw) || 0))
+    const value = Math.max(0, Math.min(100, Math.round(raw) || 0))
     const others = slices.filter((_, i) => i !== index)
     const otherSum = others.reduce((a, s) => a + s.probabilityWeight, 0)
-
-    // This slice can never take more than 100 minus what the others already hold.
-    const value = Math.min(requested, Math.max(0, 100 - otherSum))
-    const remaining = 100 - value
+    const remaining = 100 - value;
 
     const updated = slices.map((s) => ({ ...s }))
     updated[index] = { ...updated[index], probabilityWeight: value }
 
     if (others.length === 0) {
       updated[index] = { ...updated[index], probabilityWeight: 100 }
+    } else if (remaining <= 0) {
+      others.forEach((s) => {
+        updated[slices.indexOf(s)] = { ...updated[slices.indexOf(s)], probabilityWeight: 0 }
+      })
     } else if (otherSum > 0) {
       // Scale others proportionally to absorb `remaining`.
       let assigned = 0
       others.forEach((s, k) => {
         const i = slices.indexOf(s)
         const share = k === others.length - 1
-          ? remaining - assigned
+          ? Math.max(0, remaining - assigned)
           : Math.round((remaining * s.probabilityWeight) / otherSum)
         assigned += share
-        updated[i] = { ...updated[i], probabilityWeight: Math.max(0, share) }
+        updated[i] = { ...updated[i], probabilityWeight: share }
       })
     } else {
       // Others all at 0 — split evenly.
@@ -115,7 +117,8 @@ export function WheelSettingsPage() {
         updated[i] = { ...updated[i], probabilityWeight: w }
       })
     }
-    setSlices(updated)
+    // Guarantees the total is exactly 100 after rounding.
+    setSlices(normalizeWeights(updated))
   }
 
   const addSlice = () => {
