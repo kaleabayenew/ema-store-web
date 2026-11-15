@@ -1,7 +1,7 @@
 import {
   BarChart3, Bell, Bike, Boxes, Building2, CreditCard, FileText, Flame, Gavel,
-  Image, Inbox, Info, LayoutDashboard, Megaphone, MessageSquareText, PackageCheck, Plug, Star,
-  Settings, ShoppingCart, Sparkles, Sun, UserRoundCog, Users, Wallet, Warehouse,
+  Image, Inbox, Info, LayoutDashboard, Megaphone, MessageSquareText, PackageCheck, Plug, Smartphone, Star,
+  Settings, ShoppingCart, Sparkles, Store, Sun, UserRoundCog, Users, Wallet, Warehouse,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -37,6 +37,8 @@ export const navGroups: { title: string; items: NavItem[] }[] = [
       { title: 'Banners',    href: '/banners',   icon: Image },
       { title: 'Announcements', href: '/announcements', icon: Megaphone },
       { title: 'About',      href: '/about',     icon: Info },
+      { title: 'Customer App', href: '/app-pages/customer', icon: Smartphone },
+      { title: 'Partner App',  href: '/app-pages/partner',  icon: Store },
     ],
   },
   {

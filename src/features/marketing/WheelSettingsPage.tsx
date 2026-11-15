@@ -262,8 +262,8 @@ export function WheelSettingsPage() {
               {pieSlices}
               {/* Center circle */}
               <circle cx="50" cy="50" r="15" fill="white" stroke="#e2e8f0" strokeWidth="1" />
-              {/* Pointer */}
-              <polygon points="50,5 45,15 55,15" fill="#ef4444" />
+              {/* Pointer — points downward */}
+              <polygon points="50,95 45,85 55,85" fill="#ef4444" />
             </svg>
           </div>
           <div className="mt-4 text-center text-sm text-slate-500">

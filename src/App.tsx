@@ -8,6 +8,7 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { ConfirmProvider } from './components/ui/ConfirmDialog'
 import { TopProgressBar } from './components/ui/TopProgressBar'
 import { AboutPage } from './features/about/AboutPage'
+import { AppPagesPage } from './features/app-pages/AppPagesPage'
 import { AnnouncementsPage } from './features/announcements/AnnouncementsPage'
 import { ApprovalsPage } from './features/approvals/ApprovalsPage'
 import { ForbiddenPage } from './features/auth/ForbiddenPage'
@@ -101,6 +102,8 @@ function App() {
             <Route path="/banners"   element={<PaymentBannersPage />} />
             <Route path="/announcements" element={<AnnouncementsPage />} />
             <Route path="/about"     element={<AboutPage />} />
+            <Route path="/app-pages/customer" element={<AppPagesPage app="customer" />} />
+            <Route path="/app-pages/partner"  element={<AppPagesPage app="partner" />} />
             <Route path="/reviews"   element={<ReviewsPage />} />
             <Route path="/feedback"  element={<FeedbackPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />

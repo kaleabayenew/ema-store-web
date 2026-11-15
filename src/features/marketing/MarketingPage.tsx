@@ -3,11 +3,12 @@ import { Sparkles, Tag, Eye, MousePointerClick, Plus } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { CouponsTab } from './CouponsTab'
 import { WheelSettingsPage } from './WheelSettingsPage'
 
 const stats = [
   { label: 'Active campaigns', value: '12',   delta: '+3',     tone: 'success', icon: Sparkles },
-  { label: 'Active coupons',   value: '28',   delta: '+6',     tone: 'info',    icon: Tag },
+  { label: 'Spin wheel',       value: 'Live', delta: '3 spins/day', tone: 'info', icon: Tag },
   { label: 'Total impressions',value: '184K', delta: '+22.4%', tone: 'success', icon: Eye },
   { label: 'Coupon redemptions',value: '1,842',delta: '+14.8%',tone: 'warning', icon: MousePointerClick },
 ]
@@ -18,13 +19,6 @@ const campaigns = [
   { id: 'MK-003', name: 'Flash Deal Friday',      type: 'Push',    target: 'All customers',  impressions: '68K', clicks: '8.1K', ctr: '11.9%',status: 'COMPLETED',start: '4 Jul', end: '4 Jul' },
   { id: 'MK-004', name: 'Partner Spotlight',      type: 'Banner',  target: 'All customers',  impressions: '12K', clicks: '890',  ctr: '7.4%', status: 'DRAFT',    start: '—',     end: '—' },
   { id: 'MK-005', name: 'Back to School',         type: 'Email',   target: 'Segment: Youth', impressions: '—',   clicks: '—',    ctr: '—',    status: 'SCHEDULED',start: '20 Jul',end: '10 Aug' },
-]
-
-const coupons = [
-  { code: 'EMA10',    discount: '10% off',      minOrder: 'ETB 500',  used: 284, limit: 500,  expires: '31 Jul 2025', status: 'ACTIVE' },
-  { code: 'NEWUSER',  discount: 'ETB 100 off',  minOrder: 'ETB 300',  used: 1042,limit: 2000, expires: '31 Dec 2025', status: 'ACTIVE' },
-  { code: 'FLASH25',  discount: '25% off',      minOrder: 'ETB 1000', used: 516, limit: 516,  expires: '4 Jul 2025',  status: 'EXPIRED' },
-  { code: 'PARTNER5', discount: '5% off',       minOrder: 'ETB 200',  used: 88,  limit: 300,  expires: '31 Aug 2025', status: 'ACTIVE' },
 ]
 
 const campaignVariant: Record<string, 'success' | 'warning' | 'default' | 'info'> = {
@@ -98,38 +92,7 @@ export function MarketingPage() {
           </div>
         )}
 
-        {tab === 'coupons' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left dark:border-slate-800">
-                  {['Code', 'Discount', 'Min. order', 'Used / Limit', 'Expires', 'Status'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {coupons.map((c) => (
-                  <tr key={c.code} className="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                    <td className="px-4 py-3 font-mono font-bold text-brand-700 dark:text-brand-300">{c.code}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{c.discount}</td>
-                    <td className="px-4 py-3 text-slate-500">{c.minOrder}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                          <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.min((c.used / c.limit) * 100, 100)}%` }} />
-                        </div>
-                        <span className="text-xs text-slate-500">{c.used}/{c.limit}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">{c.expires}</td>
-                    <td className="px-4 py-3"><Badge variant={c.status === 'ACTIVE' ? 'success' : 'danger'}>{c.status.charAt(0) + c.status.slice(1).toLowerCase()}</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {tab === 'coupons' && <CouponsTab />}
 
         {tab === 'wheel' && <WheelSettingsPage />}
       </div>
