@@ -168,7 +168,7 @@ export function CouponsTab() {
       title: 'Delete coupon',
       message: `Delete coupon "${c.code}"? Customers who claimed it will lose it.`,
       confirmText: 'Delete',
-      danger: true,
+      variant: 'danger',
     })
     if (!ok) return
     try {
