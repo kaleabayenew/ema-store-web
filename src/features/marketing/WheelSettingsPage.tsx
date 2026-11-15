@@ -21,25 +21,67 @@ interface WheelSlice {
 
 // ── Wheel Settings Page ───────────────────────────────────────────────────────
 
-// Scale weights so they always sum to exactly 100 (percentages).
-function normalizeWeights(list: WheelSlice[]): WheelSlice[] {
+// Reward slices keep their %; "Try Again" (NONE) slices automatically absorb
+// whatever is left so the wheel always totals exactly 100. If the reward
+// slices alone exceed 100 they are scaled down proportionally and try-again
+// slices drop to 0. If there is no try-again slice and there is a remainder,
+// one is appended automatically.
+function balanceWithTryAgain(list: WheelSlice[], newId: () => number): WheelSlice[] {
   if (list.length === 0) return list
-  const total = list.reduce((a, s) => a + (s.probabilityWeight || 0), 0)
-  if (total <= 0) {
-    const even = Math.floor(100 / list.length)
-    let leftover = 100 - even * list.length
-    return list.map((s) => {
-      const w = even + (leftover > 0 ? 1 : 0)
+  const isTryAgain = (s: WheelSlice) => s.rewardType === 'NONE'
+  const out = list.map((s) => ({ ...s }))
+  const rewardSum = out.filter((s) => !isTryAgain(s)).reduce((a, s) => a + s.probabilityWeight, 0)
+  const tryAgainIdx = out.map((s, i) => (isTryAgain(s) ? i : -1)).filter((i) => i >= 0)
+
+  const fixTotal = (arr: WheelSlice[]) => {
+    const total = arr.reduce((a, s) => a + s.probabilityWeight, 0)
+    if (total === 100 || arr.length === 0) return arr
+    let maxI = 0
+    arr.forEach((s, i) => { if (s.probabilityWeight > arr[maxI].probabilityWeight) maxI = i })
+    const fixed = arr.map((s) => ({ ...s }))
+    fixed[maxI] = {
+      ...fixed[maxI],
+      probabilityWeight: Math.max(0, fixed[maxI].probabilityWeight + (100 - total)),
+    }
+    return fixed
+  }
+
+  if (rewardSum >= 100) {
+    if (rewardSum > 0) {
+      out.forEach((s, i) => {
+        out[i] = isTryAgain(s)
+          ? { ...s, probabilityWeight: 0 }
+          : { ...s, probabilityWeight: Math.round((s.probabilityWeight / rewardSum) * 100) }
+      })
+    } else {
+      out.forEach((s, i) => { out[i] = { ...s, probabilityWeight: 0 } })
+      out[0] = { ...out[0], probabilityWeight: 100 }
+    }
+    return fixTotal(out)
+  }
+
+  const remainder = 100 - rewardSum
+  if (tryAgainIdx.length > 0) {
+    const each = Math.floor(remainder / tryAgainIdx.length)
+    let leftover = remainder - each * tryAgainIdx.length
+    tryAgainIdx.forEach((i) => {
+      const w = each + (leftover > 0 ? 1 : 0)
       leftover = Math.max(0, leftover - 1)
-      return { ...s, probabilityWeight: w }
+      out[i] = { ...out[i], probabilityWeight: w }
+    })
+  } else if (remainder > 0) {
+    out.push({
+      id: newId(),
+      sliceIndex: out.length + 1,
+      label: 'Try Again',
+      rewardType: 'NONE',
+      rewardValue: 0,
+      probabilityWeight: remainder,
+      colorHex: '#94A3B8',
+      isActive: true,
     })
   }
-  let assigned = 0
-  return list.map((s, i) => {
-    const w = i === list.length - 1 ? 100 - assigned : Math.round((s.probabilityWeight / total) * 100)
-    assigned += w
-    return { ...s, probabilityWeight: Math.max(0, w) }
-  })
+  return out
 }
 
 export function WheelSettingsPage() {
@@ -50,7 +92,10 @@ export function WheelSettingsPage() {
   const [activeTab, setActiveTab] = useState(0)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const [savedJson, setSavedJson] = useState('')
   const nextTempId = useRef(-1)
+
+  const isDirty = JSON.stringify(slices) !== savedJson
 
   const WHEEL_COLORS = ['#0F6841', '#2563EB', '#DC2626', '#D97706', '#7C3AED', '#DB2777', '#0891B2', '#65A30D']
 
@@ -59,8 +104,9 @@ export function WheelSettingsPage() {
     setError(null)
     try {
       const res = await api.get('/marketing/admin/wheel-config')
-      const loaded: WheelSlice[] = normalizeWeights(res.data.slices ?? [])
+      const loaded: WheelSlice[] = balanceWithTryAgain(res.data.slices ?? [], () => nextTempId.current--)
       setSlices(loaded)
+      setSavedJson(JSON.stringify(loaded))
       setActiveTab((t) => Math.min(t, Math.max(0, loaded.length - 1)))
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Failed to load wheel configuration')
@@ -77,48 +123,13 @@ export function WheelSettingsPage() {
     setSlices(updated)
   }
 
-  // Keep every slice weight as a percentage so the total is always exactly 100.
-  // Editing one slice redistributes the difference across the others — the
-  // others scale down/up to make room, so any value 0–100 is allowed.
+  // Set a reward slice's % — "Try Again" slices automatically absorb the
+  // remainder so the total always stays exactly 100.
   const setSliceWeight = (index: number, raw: number) => {
     const value = Math.max(0, Math.min(100, Math.round(raw) || 0))
-    const others = slices.filter((_, i) => i !== index)
-    const otherSum = others.reduce((a, s) => a + s.probabilityWeight, 0)
-    const remaining = 100 - value;
-
     const updated = slices.map((s) => ({ ...s }))
     updated[index] = { ...updated[index], probabilityWeight: value }
-
-    if (others.length === 0) {
-      updated[index] = { ...updated[index], probabilityWeight: 100 }
-    } else if (remaining <= 0) {
-      others.forEach((s) => {
-        updated[slices.indexOf(s)] = { ...updated[slices.indexOf(s)], probabilityWeight: 0 }
-      })
-    } else if (otherSum > 0) {
-      // Scale others proportionally to absorb `remaining`.
-      let assigned = 0
-      others.forEach((s, k) => {
-        const i = slices.indexOf(s)
-        const share = k === others.length - 1
-          ? Math.max(0, remaining - assigned)
-          : Math.round((remaining * s.probabilityWeight) / otherSum)
-        assigned += share
-        updated[i] = { ...updated[i], probabilityWeight: share }
-      })
-    } else {
-      // Others all at 0 — split evenly.
-      const even = Math.floor(remaining / others.length)
-      let leftover = remaining - even * others.length
-      others.forEach((s) => {
-        const i = slices.indexOf(s)
-        const w = even + (leftover > 0 ? 1 : 0)
-        leftover = Math.max(0, leftover - 1)
-        updated[i] = { ...updated[i], probabilityWeight: w }
-      })
-    }
-    // Guarantees the total is exactly 100 after rounding.
-    setSlices(normalizeWeights(updated))
+    setSlices(balanceWithTryAgain(updated, () => nextTempId.current--))
   }
 
   const addSlice = () => {
@@ -126,19 +137,22 @@ export function WheelSettingsPage() {
       id: nextTempId.current--,
       sliceIndex: slices.length + 1,
       label: `Slice ${slices.length + 1}`,
-      rewardType: 'NONE',
-      rewardValue: 0,
-      probabilityWeight: 10,
+      rewardType: 'COINS',
+      rewardValue: 10,
+      probabilityWeight: 0,
       colorHex: WHEEL_COLORS[slices.length % WHEEL_COLORS.length],
       isActive: true,
     }
-    // Rebalance so the total stays at 100%.
-    setSlices(normalizeWeights([...slices, slice]))
+    // Try-again slices absorb the remainder, keeping the total at 100%.
+    setSlices(balanceWithTryAgain([...slices, slice], () => nextTempId.current--))
     setActiveTab(slices.length)
   }
 
   const removeSlice = (index: number) => {
-    const updated = normalizeWeights(slices.filter((_, i) => i !== index))
+    const updated = balanceWithTryAgain(
+      slices.filter((_, i) => i !== index),
+      () => nextTempId.current--
+    )
     setSlices(updated)
     setActiveTab((t) => Math.min(t, Math.max(0, updated.length - 1)))
   }
@@ -226,9 +240,9 @@ export function WheelSettingsPage() {
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} disabled={saving || !isDirty}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Save Changes
+            {isDirty ? 'Save Changes' : 'Saved'}
           </Button>
         </div>
       </div>
@@ -381,7 +395,11 @@ export function WheelSettingsPage() {
                             <Label className="text-xs">Reward Type</Label>
                             <select
                               value={slice.rewardType}
-                              onChange={(e) => updateSlice(index, 'rewardType', e.target.value)}
+                              onChange={(e) => {
+                                const updated = slices.map((s) => ({ ...s }))
+                                updated[index] = { ...updated[index], rewardType: e.target.value as WheelSlice['rewardType'] }
+                                setSlices(balanceWithTryAgain(updated, () => nextTempId.current--))
+                              }}
                               className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
                             >
                               <option value="COUPON">Coupon</option>
@@ -404,12 +422,15 @@ export function WheelSettingsPage() {
                               type="number"
                               min={0}
                               max={100}
+                              disabled={slice.rewardType === 'NONE'}
                               value={slice.probabilityWeight}
                               onChange={(e) => setSliceWeight(index, parseInt(e.target.value) || 0)}
                               className="mt-1"
                             />
                             <p className="mt-1 text-[11px] text-slate-400">
-                              All slices must total 100% — others adjust automatically.
+                              {slice.rewardType === 'NONE'
+                                ? 'Try Again automatically gets the remaining %.'
+                                : 'Reward slices keep their % — Try Again fills the rest to 100.'}
                             </p>
                           </div>
                           <div className="sm:col-span-2">
@@ -433,6 +454,17 @@ export function WheelSettingsPage() {
                     )
                   })()
                 )}
+              </div>
+
+              {/* Save bar */}
+              <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+                <span className={`text-xs ${isDirty ? 'font-medium text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}>
+                  {isDirty ? '● Unsaved changes' : 'All changes saved'}
+                </span>
+                <Button onClick={handleSave} disabled={saving || !isDirty} size="sm">
+                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Save Wheel
+                </Button>
               </div>
             </>
           )}
