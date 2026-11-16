@@ -37,13 +37,13 @@ export const navGroups: { title: string; items: NavItem[] }[] = [
       { title: 'Banners',    href: '/banners',   icon: Image },
       { title: 'Announcements', href: '/announcements', icon: Megaphone },
       { title: 'About',      href: '/about',     icon: Info },
-      { title: 'Customer App', href: '/app-pages/customer', icon: Smartphone },
-      { title: 'Partner App',  href: '/app-pages/partner',  icon: Store },
     ],
   },
   {
     title: 'Admin',
     items: [
+      { title: 'Customer App', href: '/app-pages/customer', icon: Smartphone },
+      { title: 'Partner App',  href: '/app-pages/partner',  icon: Store },
       { title: 'Manage Users', href: '/users',              icon: UserRoundCog },
       { title: 'Notifications', href: '/notifications',      icon: Bell },
       { title: 'API',          href: '/integrations',       icon: Plug },

@@ -38,8 +38,8 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   '/top-rated': ['SUPER_ADMIN'],
   '/special-offers': ['SUPER_ADMIN'],
   '/about': ['SUPER_ADMIN'],
-  '/app-pages/customer': ['SUPER_ADMIN', 'MANAGEMENT'],
-  '/app-pages/partner': ['SUPER_ADMIN', 'MANAGEMENT'],
+  '/app-pages/customer': ['SUPER_ADMIN'],
+  '/app-pages/partner': ['SUPER_ADMIN'],
   '/language': ['SUPER_ADMIN'],
 }
 

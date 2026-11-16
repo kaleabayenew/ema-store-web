@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Eye, EyeOff, Loader2, Lock, LockOpen, RefreshCw, Store, Smartphone } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Lock, LockOpen, RefreshCw, Store, Smartphone, Wrench } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import api from '@/lib/api'
@@ -42,13 +42,25 @@ export function AppPagesPage({ app }: { app: AppKind }) {
   const [error, setError] = useState<string | null>(null)
   const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set())
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set())
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false)
+  const [maintenanceMessage, setMaintenanceMessage] = useState('')
+  const [maintenanceSaving, setMaintenanceSaving] = useState(false)
+  const [maintenanceSaved, setMaintenanceSaved] = useState(false)
 
   const fetchPages = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await api.get(`/app-pages/${app}`)
-      setPages(res.data.pages ?? [])
+      const [pagesRes, maintRes] = await Promise.all([
+        api.get(`/app-pages/${app}`),
+        api.get(`/app-pages/${app}/maintenance`).catch(() => null),
+      ])
+      setPages(pagesRes.data.pages ?? [])
+      const m = maintRes?.data?.maintenance
+      if (m) {
+        setMaintenanceEnabled(m.enabled === true)
+        setMaintenanceMessage(m.message ?? '')
+      }
     } catch (err: any) {
       setError(apiErrorMessage(err, 'Failed to load app pages'))
     } finally {
@@ -87,6 +99,23 @@ export function AppPagesPage({ app }: { app: AppKind }) {
     }
   }
 
+  const saveMaintenance = async () => {
+    setMaintenanceSaving(true)
+    setError(null)
+    try {
+      await api.put(`/app-pages/${app}/maintenance`, {
+        enabled: maintenanceEnabled,
+        message: maintenanceMessage,
+      })
+      setMaintenanceSaved(true)
+      setTimeout(() => setMaintenanceSaved(false), 2000)
+    } catch (err: any) {
+      setError(apiErrorMessage(err, 'Failed to update maintenance mode'))
+    } finally {
+      setMaintenanceSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -107,6 +136,67 @@ export function AppPagesPage({ app }: { app: AppKind }) {
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
+      </div>
+
+      {/* Maintenance mode */}
+      <div className={`overflow-hidden rounded-2xl border shadow-sm ${
+        maintenanceEnabled
+          ? 'border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20'
+          : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'
+      }`}>
+        <div className="flex flex-wrap items-center gap-4 px-5 py-4">
+          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+            maintenanceEnabled
+              ? 'bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-400'
+              : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+          }`}>
+            <Wrench className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              Maintenance Mode
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {maintenanceEnabled
+                ? 'The app is closed — users see an "under maintenance" screen.'
+                : 'The app is live and available to users.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMaintenanceEnabled((v) => !v)}
+            className={`relative h-7 w-12 rounded-full transition-colors ${
+              maintenanceEnabled ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-600'
+            }`}
+            aria-pressed={maintenanceEnabled}
+          >
+            <span
+              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${
+                maintenanceEnabled ? 'left-[22px]' : 'left-0.5'
+              }`}
+            />
+          </button>
+          <span className={`text-xs font-bold ${maintenanceEnabled ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+            {maintenanceEnabled ? 'APP UNAVAILABLE' : 'APP LIVE'}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-slate-200/70 px-5 py-3 dark:border-slate-800">
+          <input
+            type="text"
+            value={maintenanceMessage}
+            onChange={(e) => setMaintenanceMessage(e.target.value)}
+            placeholder="Message shown to users (optional), e.g. Back at 6 PM"
+            className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            maxLength={300}
+          />
+          <Button size="sm" onClick={saveMaintenance} disabled={maintenanceSaving}>
+            {maintenanceSaving && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+            Save Maintenance
+          </Button>
+          {maintenanceSaved && !maintenanceSaving && (
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Saved</span>
+          )}
+        </div>
       </div>
 
       {error && (
