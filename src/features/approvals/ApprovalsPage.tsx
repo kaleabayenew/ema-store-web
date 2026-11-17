@@ -45,7 +45,11 @@ function DetailRow({ label, value }: { label: string; value: unknown }) {
 export function ApprovalsPage() {
   const { user } = useAuthStore()
   const confirmDialog = useConfirm()
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const isSuperAdmin =
+    user?.role === 'SUPER_ADMIN' ||
+    user?.role === 'ADMIN' ||
+    user?.role === 'PRODUCT_MANAGER' ||
+    user?.role === 'MANAGER'
 
   const [items, setItems] = useState<ApprovalItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -136,7 +140,7 @@ export function ApprovalsPage() {
   const stats = [
     { label: 'Pending partners', value: pendingPartners, icon: Building2 },
     { label: 'Pending products', value: pendingProducts, icon: Boxes },
-    { label: 'Total pending',   value: items.length,        icon: CheckCircle2 },
+    { label: 'Total pending', value: items.length, icon: CheckCircle2 },
   ]
 
   return (
@@ -316,7 +320,7 @@ export function ApprovalsPage() {
 
             {!isSuperAdmin && (
               <p className="mt-5 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                <Mail className="h-3.5 w-3.5" /> Only a super admin can approve or reject submissions.
+                <Mail className="h-3.5 w-3.5" /> Staff admin permission required to approve or reject submissions.
               </p>
             )}
           </div>

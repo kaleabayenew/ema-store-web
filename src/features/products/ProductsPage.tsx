@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Boxes, Package, Star, Search, Pencil, Trash2, Loader2, AlertCircle, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
+import { Boxes, Package, Star, Search, Pencil, Trash2, Loader2, AlertCircle, ChevronLeft, ChevronRight, Eye, CheckCircle2 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -56,7 +56,35 @@ const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'default'
 export function ProductsPage() {
   const alert = useAlert()
   const { user } = useAuthStore()
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const isSuperAdmin =
+    user?.role === 'SUPER_ADMIN' ||
+    user?.role === 'ADMIN' ||
+    user?.role === 'PRODUCT_MANAGER' ||
+    user?.role === 'MANAGER'
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+
+  const handleApproveProduct = async (id: string, name: string) => {
+    try {
+      setApprovingId(id)
+      await api.post(`/admin/approvals/PRODUCT/${id}/review`, { action: 'approve' })
+      alert({
+        title: 'Product Approved',
+        message: `"${name}" has been approved and is now active for customers.`,
+      })
+      await fetchProducts()
+      if (viewingProduct?.id === id) {
+        setViewingProduct(null)
+      }
+    } catch (err: any) {
+      alert({
+        title: 'Approval Failed',
+        message: apiErrorMessage(err, 'Failed to approve product'),
+        variant: 'error',
+      })
+    } finally {
+      setApprovingId(null)
+    }
+  }
   const [products, setProducts]     = useState<Product[]>([])
   const [total, setTotal]           = useState(0)
   const [page, setPage]             = useState(1)
@@ -86,7 +114,7 @@ export function ProductsPage() {
     setError(null)
     try {
       const response = await api.get('/products', {
-        params: { search: debouncedSearch, status: filter === 'All' ? undefined : filter, page, limit: PAGE_SIZE },
+        params: { search: debouncedSearch, status: filter === 'All' ? 'ALL' : filter, page, limit: PAGE_SIZE },
       })
       const data = (response.data.products ?? []) as Product[]
       setProducts(data)
@@ -439,20 +467,34 @@ export function ProductsPage() {
                     </td>
                     {/* Actions */}
                     <td className="px-4 py-3">
-                      {isSuperAdmin ? (
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="icon" title="Edit" onClick={() => openEditDialog(p)}>
-                            <Pencil className="h-4 w-4" />
+                      <div className="flex items-center gap-1">
+                        {p.status === 'PENDING' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                            title="Approve product"
+                            disabled={approvingId === p.id}
+                            onClick={() => handleApproveProduct(p.id, p.nameEn)}
+                          >
+                            {approvingId === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                           </Button>
-                          <Button variant="ghost" size="icon" title="Delete" onClick={() => openDeleteDialog(p)}>
-                            <Trash2 className="h-4 w-4 text-red-600" />
+                        )}
+                        {isSuperAdmin ? (
+                          <>
+                            <Button variant="ghost" size="icon" title="Edit" onClick={() => openEditDialog(p)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" title="Delete" onClick={() => openDeleteDialog(p)}>
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </>
+                        ) : (
+                          <Button variant="ghost" size="icon" title="View" onClick={() => setViewingProduct(p)}>
+                            <Eye className="h-4 w-4" />
                           </Button>
-                        </div>
-                      ) : (
-                        <Button variant="ghost" size="icon" title="View" onClick={() => setViewingProduct(p)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      )}
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -579,7 +621,17 @@ export function ProductsPage() {
                 </div>
               )}
             </div>
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex items-center justify-between gap-3">
+              {viewingProduct.status === 'PENDING' ? (
+                <Button
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  disabled={approvingId === viewingProduct.id}
+                  onClick={() => handleApproveProduct(viewingProduct.id, viewingProduct.nameEn)}
+                >
+                  {approvingId === viewingProduct.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Approve Product
+                </Button>
+              ) : <div />}
               <Button variant="outline" onClick={() => setViewingProduct(null)}>Close</Button>
             </div>
           </div>
