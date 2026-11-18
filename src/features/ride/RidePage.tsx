@@ -86,6 +86,12 @@ export function RidePage() {
 
   useEffect(() => { fetchAgents() }, [fetchAgents])
 
+  // Auto-refresh every 10s so rider status stays live.
+  useEffect(() => {
+    const t = setInterval(() => fetchAgents(), 10000)
+    return () => clearInterval(t)
+  }, [fetchAgents])
+
   const filtered = agents.filter((a) => {
     const q = search.toLowerCase()
     const matchSearch =

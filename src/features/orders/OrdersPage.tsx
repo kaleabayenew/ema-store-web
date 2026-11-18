@@ -139,8 +139,8 @@ export function OrdersPage() {
 
   const PAGE_SIZE = 15
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true)
+  const fetchOrders = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError(null)
     try {
       const res = await api.get('/orders/admin', {
@@ -169,6 +169,12 @@ export function OrdersPage() {
   }, [debouncedSearch, filter, page])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
+
+  // Auto-refresh every 10s so new customer orders appear live (silent — no spinner).
+  useEffect(() => {
+    const t = setInterval(() => fetchOrders(true), 10000)
+    return () => clearInterval(t)
+  }, [fetchOrders])
 
   // Debounce search → single fetch after typing stops, page reset batched.
   useEffect(() => {
@@ -240,7 +246,7 @@ export function OrdersPage() {
         <div className="text-center">
           <AlertCircle className="mx-auto h-10 w-10 text-red-500" />
           <p className="mt-4 text-sm text-slate-500">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={fetchOrders}>Retry</Button>
+          <Button variant="outline" className="mt-4" onClick={() => fetchOrders()}>Retry</Button>
         </div>
       </div>
     )
@@ -254,7 +260,7 @@ export function OrdersPage() {
           <p className="text-sm font-medium text-brand-600">Order management</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Orders</h1>
         </div>
-        <Button variant="outline" onClick={fetchOrders} disabled={loading}>
+        <Button variant="outline" onClick={() => fetchOrders()} disabled={loading}>
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Refresh
         </Button>
       </div>
