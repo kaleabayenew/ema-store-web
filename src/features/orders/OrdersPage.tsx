@@ -28,6 +28,9 @@ interface Order {
   customerName: string
   customerPhone: string
   itemCount: number
+  deliveryCode?: string | null
+  deliveryAgentName?: string | null
+  deliveryAgentCode?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -44,6 +47,16 @@ interface OrderDetail extends Order {
   customerEmail: string
   deliveryMethod?: string | null
   paymentId?: string | null
+  deliveryAgentId?: string | null
+  deliveryAgentPhone?: string | null
+  handoverRequestedAt?: string | null
+  handedOverAt?: string | null
+  deliveryAcceptedAt?: string | null
+  riderArrivedAt?: string | null
+  deliveryRequestedAt?: string | null
+  deliveredAt?: string | null
+  customerAcceptedAt?: string | null
+  paymentStatus?: string | null
   items: OrderItem[]
 }
 
@@ -305,7 +318,7 @@ export function OrdersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left dark:border-slate-800">
-                {['Order ID', 'Customer', 'Items', 'Total', 'Payment', 'Status', 'Date', ''].map((h) => (
+                {['Order ID', 'Customer', 'Items', 'Rider', 'Total', 'Payment', 'Status', 'Date', ''].map((h) => (
                   <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{h}</th>
                 ))}
               </tr>
@@ -313,19 +326,31 @@ export function OrdersPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {orders.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
+                  <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
                     <ShoppingCart className="mx-auto mb-2 h-8 w-8" />No orders found.
                   </td>
                 </tr>
               )}
               {orders.map((o) => (
                 <tr key={o.id} className="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                  <td className="px-4 py-3 font-mono font-semibold text-brand-700 dark:text-brand-300">{shortId(o.id)}</td>
+                  <td className="px-4 py-3 font-mono font-semibold text-brand-700 dark:text-brand-300">
+                    {o.deliveryCode || shortId(o.id)}
+                  </td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-slate-900 dark:text-slate-100 truncate max-w-[140px]">{o.customerName}</p>
                     {o.customerPhone && <p className="text-xs text-slate-400">{o.customerPhone}</p>}
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{o.itemCount}</td>
+                  <td className="px-4 py-3">
+                    {o.deliveryAgentName ? (
+                      <>
+                        <p className="font-medium text-slate-900 dark:text-slate-100 truncate max-w-[120px]">{o.deliveryAgentName}</p>
+                        {o.deliveryAgentCode && <p className="text-xs text-slate-400 font-mono">{o.deliveryAgentCode}</p>}
+                      </>
+                    ) : (
+                      <span className="text-xs text-slate-400">Unassigned</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{formatCurrency(o.totalAmount)}</td>
                   <td className="px-4 py-3 text-slate-500 truncate max-w-[120px]">{o.paymentMethod}</td>
                   <td className="px-4 py-3">
@@ -412,7 +437,15 @@ export function OrdersPage() {
                   { label: 'Email', value: detail.customerEmail || '—' },
                   { label: 'Payment', value: detail.paymentMethod },
                   { label: 'Payment ID', value: detail.paymentId || '—' },
+                  { label: 'Payment status', value: detail.paymentStatus || '—' },
                   { label: 'Delivery method', value: detail.deliveryMethod || '—' },
+                  { label: 'Delivery code', value: detail.deliveryCode || '—' },
+                  { label: 'Rider', value: detail.deliveryAgentName || '—' },
+                  { label: 'Rider phone', value: detail.deliveryAgentPhone || '—' },
+                  { label: 'Agent code', value: detail.deliveryAgentCode || '—' },
+                  { label: 'Handed over', value: detail.handedOverAt ? formatDate(detail.handedOverAt) : '—' },
+                  { label: 'Delivered', value: detail.deliveredAt ? formatDate(detail.deliveredAt) : '—' },
+                  { label: 'Customer accepted', value: detail.customerAcceptedAt ? formatDate(detail.customerAcceptedAt) : '—' },
                   { label: 'Order total', value: formatCurrency(detail.totalAmount), highlight: true },
                   { label: 'Date', value: formatDate(detail.createdAt) },
                   { label: 'Shipping', value: detail.shippingAddress },
