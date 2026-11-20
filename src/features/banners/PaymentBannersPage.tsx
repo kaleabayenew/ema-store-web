@@ -107,7 +107,10 @@ interface PaymentBanner {
   redirect_url: string
   is_active: boolean
   created_at: string
+  placement?: string
 }
+
+type BannerPlacement = 'payment' | 'ride'
 
 // ─── Image field: URL input + file upload button ───────────────────────────────
 function ImageField({
@@ -203,6 +206,7 @@ function ImageField({
 function BannerForm({
   formData,
   onChange,
+  placement,
 }: {
   formData: {
     title: string
@@ -213,6 +217,7 @@ function BannerForm({
     redirect_url: string
   }
   onChange: (patch: Partial<typeof formData>) => void
+  placement: BannerPlacement
 }) {
   return (
     <div className="space-y-4">
@@ -267,11 +272,23 @@ function BannerForm({
       </div>
 
       <div>
-        <Label>Redirect to page (optional)</Label>
-        <RedirectUrlField
-          value={formData.redirect_url}
-          onChange={(url) => onChange({ redirect_url: url })}
-        />
+        <Label>
+          {placement === 'ride'
+            ? 'Link URL (optional — opens in the rider app)'
+            : 'Redirect to page (optional)'}
+        </Label>
+        {placement === 'ride' ? (
+          <Input
+            value={formData.redirect_url}
+            onChange={(e) => onChange({ redirect_url: e.target.value })}
+            placeholder="https://example.com/promo"
+          />
+        ) : (
+          <RedirectUrlField
+            value={formData.redirect_url}
+            onChange={(url) => onChange({ redirect_url: url })}
+          />
+        )}
       </div>
     </div>
   )
@@ -298,12 +315,13 @@ export function PaymentBannersPage() {
   const [editingBanner, setEditingBanner] = useState<PaymentBanner | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState(emptyForm())
+  const [placement, setPlacement] = useState<BannerPlacement>('payment')
 
   const fetchBanners = async () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await api.get('/banners/payment/all')
+      const response = await api.get(`/banners/${placement}/all`)
       setBanners((response.data.banners ?? []) as PaymentBanner[])
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Failed to load banners')
@@ -330,9 +348,9 @@ export function PaymentBannersPage() {
     setSubmitting(true)
     try {
       if (editingBanner) {
-        await api.patch(`/banners/payment/${editingBanner.id}`, formData)
+        await api.patch(`/banners/${placement}/${editingBanner.id}`, formData)
       } else {
-        await api.post('/banners/payment', formData)
+        await api.post(`/banners/${placement}`, formData)
       }
       await fetchBanners()
       setShowAddDialog(false)
@@ -362,13 +380,13 @@ export function PaymentBannersPage() {
   const handleDelete = async (id: string) => {
     const ok = await confirmDialog({
       title: 'Delete this banner?',
-      message: 'This payment banner will be removed permanently.',
+      message: `This ${placement === 'ride' ? 'ride' : 'payment'} banner will be removed permanently.`,
       confirmText: 'Delete',
       variant: 'danger',
     })
     if (!ok) return
     try {
-      await api.delete(`/banners/payment/${id}`)
+      await api.delete(`/banners/${placement}/${id}`)
       await fetchBanners()
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Failed to delete banner')
@@ -382,7 +400,8 @@ export function PaymentBannersPage() {
 
   useEffect(() => {
     fetchBanners()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placement])
 
   if (loading && banners.length === 0) {
     return (
@@ -398,7 +417,9 @@ export function PaymentBannersPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm font-medium text-brand-600">Banner management</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Payment Banners</h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+            {placement === 'ride' ? 'Ride App Banners' : 'Payment Banners'}
+          </h1>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchBanners} disabled={loading}>
@@ -413,6 +434,26 @@ export function PaymentBannersPage() {
             Add Banner
           </Button>
         </div>
+      </div>
+
+      {/* Placement tabs */}
+      <div className="flex w-fit gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-800">
+        {([
+          { key: 'payment' as const, label: 'Customer App' },
+          { key: 'ride' as const, label: 'Ride App' },
+        ]).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setPlacement(tab.key)}
+            className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${
+              placement === tab.key
+                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100'
+                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {error && (
@@ -436,7 +477,9 @@ export function PaymentBannersPage() {
               {banners.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
-                    No payment banners found.
+                    {placement === 'ride'
+                      ? 'No ride banners found.'
+                      : 'No payment banners found.'}
                   </td>
                 </tr>
               )}
@@ -480,9 +523,12 @@ export function PaymentBannersPage() {
       {showAddDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowAddDialog(false)}>
           <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Add Payment Banner</h2>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
+              Add {placement === 'ride' ? 'Ride' : 'Payment'} Banner
+            </h2>
             <BannerForm
               formData={formData}
+              placement={placement}
               onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
             />
             <div className="flex gap-2 justify-end mt-6">
@@ -500,9 +546,12 @@ export function PaymentBannersPage() {
       {showEditDialog && editingBanner && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setShowEditDialog(false)}>
           <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800 dark:bg-slate-900 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Edit Payment Banner</h2>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
+              Edit {placement === 'ride' ? 'Ride' : 'Payment'} Banner
+            </h2>
             <BannerForm
               formData={formData}
+              placement={placement}
               onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }))}
             />
             <div className="flex gap-2 justify-end mt-6">

@@ -33,8 +33,11 @@ interface Ticket {
   createdAt: string
   updatedAt: string
   isPartner?: boolean
+  isRider?: boolean
   userRole?: string
   shopName?: string | null
+  agentCode?: string | null
+  vehicleType?: string | null
 }
 
 function isPartnerTicket(ticketOrSubject: Ticket | TicketDetail | string | null | undefined) {
@@ -48,6 +51,21 @@ function isPartnerTicket(ticketOrSubject: Ticket | TicketDetail | string | null 
     ticketOrSubject.subject?.toLowerCase().includes('partner')
 }
 
+function isRiderTicket(ticketOrSubject: Ticket | TicketDetail | string | null | undefined) {
+  if (!ticketOrSubject) return false
+  if (typeof ticketOrSubject === 'string') {
+    const s = ticketOrSubject.toLowerCase()
+    return s.includes('rider') || s.includes('delivery') || s.includes('ride')
+  }
+  return !!ticketOrSubject.isRider ||
+    ticketOrSubject.userRole === 'RIDER' ||
+    ticketOrSubject.userRole === 'DELIVERY' ||
+    ticketOrSubject.userRole === 'DELIVERY_AGENT' ||
+    !!ticketOrSubject.agentCode ||
+    ticketOrSubject.subject?.toLowerCase().includes('rider') ||
+    ticketOrSubject.subject?.toLowerCase().includes('delivery')
+}
+
 interface Message {
   id: string
   body: string
@@ -57,6 +75,7 @@ interface Message {
   readAt?: string | null
   imageUrl?: string | null
   isPartner?: boolean
+  isRider?: boolean
 }
 
 interface TicketDetail extends Ticket {
@@ -529,7 +548,19 @@ function ConversationHistoryTab({ onOpenTicket }: { onOpenTicket: (id: string) =
                       {t.subject}
                     </td>
                     <td className="px-4 py-3 cursor-pointer" onClick={() => onOpenTicket(t.id)}>
-                      <p className="text-slate-700 dark:text-slate-200">{t.customerName}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {isRiderTicket(t.subject) && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                            🛵 Rider
+                          </span>
+                        )}
+                        {isPartnerTicket(t.subject) && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                            🏪 Partner
+                          </span>
+                        )}
+                        <p className="text-slate-700 dark:text-slate-200">{t.customerName}</p>
+                      </div>
                       {t.customerPhone && <p className="text-xs text-slate-400">{t.customerPhone}</p>}
                     </td>
                     <td className="px-4 py-3 cursor-pointer" onClick={() => onOpenTicket(t.id)}>
@@ -602,6 +633,7 @@ export function SupportPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterStatus>('All')
+  const [userTypeFilter, setUserTypeFilter] = useState<'all' | 'customer' | 'partner' | 'rider'>('all')
   const [stats, setStats] = useState({ total: 0, open: 0, inProgress: 0, resolved: 0 })
 
   const [selected, setSelected] = useState<TicketDetail | null>(null)
@@ -1092,17 +1124,34 @@ export function SupportPage() {
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                 />
               </div>
-              <div className="flex gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:thin]">
-                {(['All', 'OPEN', 'IN_PROGRESS', 'RESOLVED'] as FilterStatus[]).map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => setFilter(f)}
-                    className={`whitespace-nowrap shrink-0 rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}
-                  >
-                    {f === 'IN_PROGRESS' ? 'In progress' : f === 'All' ? 'All' : statusLabel(f)}
-                  </button>
-                ))}
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:thin]">
+                  {(['All', 'OPEN', 'IN_PROGRESS', 'RESOLVED'] as FilterStatus[]).map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setFilter(f)}
+                      className={`whitespace-nowrap shrink-0 rounded-xl px-2.5 py-1 text-xs font-medium transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}
+                    >
+                      {f === 'IN_PROGRESS' ? 'In progress' : f === 'All' ? 'All' : statusLabel(f)}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:thin]">
+                  {(['all', 'customer', 'partner', 'rider'] as const).map((ut) => (
+                    <button
+                      key={ut}
+                      type="button"
+                      onClick={() => setUserTypeFilter(ut)}
+                      className={`whitespace-nowrap shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-semibold transition ${userTypeFilter === ut
+                        ? (ut === 'rider' ? 'bg-emerald-600 text-white' : ut === 'partner' ? 'bg-amber-600 text-white' : 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900')
+                        : 'bg-slate-50 text-slate-500 hover:bg-slate-100 dark:bg-slate-800/60 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                        }`}
+                    >
+                      {ut === 'all' ? 'All Roles' : ut === 'customer' ? '👤 Customer' : ut === 'partner' ? '🏪 Partner' : '🛵 Rider'}
+                    </button>
+                  ))}
+                </div>
               </div>
               {selectedTicketIds.size > 0 && (
                 <Button
@@ -1127,70 +1176,81 @@ export function SupportPage() {
               </div>
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800 overflow-y-auto flex-1">
-                {tickets.map((t) => (
-                  <div
-                    key={t.id}
-                    className={`w-full p-4 transition hover:bg-slate-50 dark:hover:bg-slate-800/50 ${selected?.id === t.id ? 'bg-brand-50 dark:bg-brand-950/20' : ''}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* Checkbox */}
-                      <input
-                        type="checkbox"
-                        checked={selectedTicketIds.has(t.id)}
-                        onChange={(e) => {
-                          e.stopPropagation()
-                          toggleTicketSelection(t.id)
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
-                      />
-                      {/* Ticket content */}
-                      <button
-                        type="button"
-                        onClick={() => openTicket(t)}
-                        className="flex-1 text-left"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-slate-900 dark:text-slate-100">{t.subject}</p>
-                            <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
-                              {isPartnerTicket(t) && (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                                  🏪 Partner{t.shopName ? ` · ${t.shopName}` : ''}
-                                </span>
-                              )}
-                              <span className="text-xs text-slate-500">{t.customerName}</span>
-                              {t.customerPhone && (
-                                <>
-                                  <span className="text-xs text-slate-300 dark:text-slate-600">·</span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); setProfilePhone(t.customerPhone) }}
-                                    className="flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-50 hover:text-brand-700 dark:hover:bg-brand-950/30 transition"
-                                    title="View customer profile"
-                                  >
-                                    <Phone className="h-3 w-3" />{t.customerPhone}
-                                  </button>
-                                </>
-                              )}
-                              <span className="text-xs text-slate-400">· {timeAgo(t.updatedAt)} · {t.messageCount} msg</span>
+                {tickets
+                  .filter((t) => {
+                    if (userTypeFilter === 'partner') return isPartnerTicket(t)
+                    if (userTypeFilter === 'rider') return isRiderTicket(t)
+                    if (userTypeFilter === 'customer') return !isPartnerTicket(t) && !isRiderTicket(t)
+                    return true
+                  })
+                  .map((t) => (
+                    <div
+                      key={t.id}
+                      className={`w-full p-4 transition hover:bg-slate-50 dark:hover:bg-slate-800/50 ${selected?.id === t.id ? 'bg-brand-50 dark:bg-brand-950/20' : ''}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Checkbox */}
+                        <input
+                          type="checkbox"
+                          checked={selectedTicketIds.has(t.id)}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            toggleTicketSelection(t.id)
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-800"
+                        />
+                        {/* Ticket content */}
+                        <button
+                          type="button"
+                          onClick={() => openTicket(t)}
+                          className="flex-1 text-left"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium text-slate-900 dark:text-slate-100">{t.subject}</p>
+                              <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                {isRiderTicket(t) ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                    🛵 Rider{t.agentCode ? ` · ${t.agentCode}` : ''}
+                                  </span>
+                                ) : isPartnerTicket(t) ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                    🏪 Partner{t.shopName ? ` · ${t.shopName}` : ''}
+                                  </span>
+                                ) : null}
+                                <span className="text-xs text-slate-500">{t.customerName}</span>
+                                {t.customerPhone && (
+                                  <>
+                                    <span className="text-xs text-slate-300 dark:text-slate-600">·</span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); setProfilePhone(t.customerPhone) }}
+                                      className="flex items-center gap-1 rounded-md px-1 py-0.5 text-xs font-medium text-brand-600 hover:bg-brand-50 hover:text-brand-700 dark:hover:bg-brand-950/30 transition"
+                                      title="View customer profile"
+                                    >
+                                      <Phone className="h-3 w-3" />{t.customerPhone}
+                                    </button>
+                                  </>
+                                )}
+                                <span className="text-xs text-slate-400">· {timeAgo(t.updatedAt)} · {t.messageCount} msg</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-shrink-0 flex-col items-end gap-1">
+                              <div className="flex items-center gap-1.5">
+                                <Badge variant={STATUS_VARIANT[t.status]}>{statusLabel(t.status)}</Badge>
+                                {t.unreadCount > 0 && (
+                                  <Badge variant="danger">
+                                    {t.unreadCount}
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div className="flex flex-shrink-0 flex-col items-end gap-1">
-                            <div className="flex items-center gap-1.5">
-                              <Badge variant={STATUS_VARIANT[t.status]}>{statusLabel(t.status)}</Badge>
-                              {t.unreadCount > 0 && (
-                                <Badge variant="danger">
-                                  {t.unreadCount}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             )}
           </div>
@@ -1210,11 +1270,15 @@ export function SupportPage() {
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{selected.subject}</p>
                       <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
-                        {isPartnerTicket(selected) && (
+                        {isRiderTicket(selected) ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                            🛵 Rider (Delivery Agent){selected.agentCode ? ` · ${selected.agentCode}` : ''}{selected.vehicleType ? ` (${selected.vehicleType})` : ''}
+                          </span>
+                        ) : isPartnerTicket(selected) ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
                             🏪 Partner (Seller){selected.shopName ? ` · ${selected.shopName}` : ''}
                           </span>
-                        )}
+                        ) : null}
                         <span className="text-xs text-slate-500">{selected.customerName}</span>
                         {selected.customerPhone && (
                           <>
@@ -1296,13 +1360,19 @@ export function SupportPage() {
                     selected.messages.map((m) => (
                       <div key={m.id} className={`flex ${m.isStaff ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.isStaff
-                            ? 'bg-brand-600 text-white'
+                          ? 'bg-brand-600 text-white'
+                          : (m.isRider || isRiderTicket(selected))
+                            ? 'bg-emerald-50 text-emerald-950 dark:bg-emerald-950/40 dark:text-emerald-100 border border-emerald-200 dark:border-emerald-800'
                             : (m.isPartner || isPartnerTicket(selected))
                               ? 'bg-amber-100 text-amber-950 dark:bg-amber-950/40 dark:text-amber-100 border border-amber-200 dark:border-amber-800'
                               : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                           }`}>
                           <p className="mb-1 text-[11px] font-semibold opacity-70">
-                            {(m.isPartner || isPartnerTicket(selected)) ? `🏪 ${m.senderName || 'Partner'}` : m.senderName}
+                            {(m.isRider || isRiderTicket(selected))
+                              ? `🛵 ${m.senderName || 'Rider'}`
+                              : (m.isPartner || isPartnerTicket(selected))
+                                ? `🏪 ${m.senderName || 'Partner'}`
+                                : m.senderName}
                           </p>
                           {m.imageUrl && (
                             <div className="mb-2 rounded-lg overflow-hidden">

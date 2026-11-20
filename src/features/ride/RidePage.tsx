@@ -30,20 +30,36 @@ interface RideAgent {
   activeDeliveries: number
   deliveriesToday: number
   lastDeliveryAt: string | null
+  isOnline: boolean
+  lastLocationAt: string | null
+  lastLat: number | null
+  lastLng: number | null
 }
 
 interface RideStats {
   totalRiders: number
   activeRiders: number
+  onlineRiders: number
   deliveriesToday: number
   completedDeliveries: number
 }
 
-type StatusFilter = 'All' | 'ACTIVE' | 'INACTIVE' | 'ON_DELIVERY'
+type StatusFilter = 'All' | 'ONLINE' | 'ACTIVE' | 'INACTIVE' | 'ON_DELIVERY'
 
 function formatDate(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-ET', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function timeAgo(iso: string | null) {
+  if (!iso) return 'never'
+  const secs = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000))
+  if (secs < 60) return `${secs}s ago`
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
 }
 
 function agentStatus(a: RideAgent): 'ACTIVE' | 'INACTIVE' | 'ON_DELIVERY' {
@@ -56,7 +72,7 @@ const statusVariant: Record<string, 'success' | 'warning' | 'info' | 'default'> 
   ACTIVE: 'success', ON_DELIVERY: 'info', INACTIVE: 'default',
 }
 const statusLabel: Record<string, string> = {
-  ACTIVE: 'Available', ON_DELIVERY: 'On delivery', INACTIVE: 'Inactive',
+  ONLINE: 'Online now', ACTIVE: 'Available', ON_DELIVERY: 'On delivery', INACTIVE: 'Inactive',
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -98,7 +114,9 @@ export function RidePage() {
       a.fullName.toLowerCase().includes(q) ||
       a.agentCode.toLowerCase().includes(q) ||
       (a.phone ?? '').includes(q)
-    const matchFilter = filter === 'All' || agentStatus(a) === filter
+    const matchFilter =
+      filter === 'All' ||
+      (filter === 'ONLINE' ? a.isOnline : agentStatus(a) === filter)
     return matchSearch && matchFilter
   })
 
@@ -142,7 +160,7 @@ export function RidePage() {
   }
 
   const statCards = [
-    { label: 'Active riders',    value: String(stats?.totalRiders ?? agents.length),      delta: null,            tone: 'success', icon: Bike },
+    { label: 'Riders online',    value: String(stats?.onlineRiders ?? agents.filter((a) => a.isOnline).length), delta: null, tone: 'success', icon: Bike },
     { label: 'Riders on delivery', value: String(stats?.activeRiders ?? busyAgents.length), delta: null,         tone: 'info',    icon: MapPin },
     { label: 'Deliveries today', value: String(stats?.deliveriesToday ?? 0),               delta: null,            tone: 'success', icon: Clock },
     { label: 'Completed total',  value: String(stats?.completedDeliveries ?? 0),            delta: null,            tone: 'success', icon: CheckCircle2 },
@@ -211,7 +229,7 @@ export function RidePage() {
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-72" />
           </div>
           <div className="flex gap-2">
-            {(['All', 'ACTIVE', 'ON_DELIVERY', 'INACTIVE'] as const).map((f) => (
+            {(['All', 'ONLINE', 'ACTIVE', 'ON_DELIVERY', 'INACTIVE'] as const).map((f) => (
               <button key={f} type="button" onClick={() => setFilter(f)}
                 className={`rounded-xl px-3 py-1.5 text-xs font-medium transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}>
                 {statusLabel[f] ?? f}
@@ -252,7 +270,15 @@ export function RidePage() {
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{a.completedDeliveries}</td>
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{a.deliveriesToday}</td>
                     <td className="px-4 py-3 text-slate-500">{formatDate(a.lastDeliveryAt)}</td>
-                    <td className="px-4 py-3"><Badge variant={statusVariant[st]}>{statusLabel[st]}</Badge></td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${a.isOnline ? 'animate-pulse bg-green-500' : 'bg-slate-300 dark:bg-slate-600'}`} title={a.isOnline ? 'Online — reporting location' : 'Offline'} />
+                        <Badge variant={statusVariant[st]}>{statusLabel[st]}</Badge>
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {a.isOnline ? 'Live now' : `Last seen ${timeAgo(a.lastLocationAt)}`}
+                      </p>
+                    </td>
                     <td className="px-4 py-3">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
