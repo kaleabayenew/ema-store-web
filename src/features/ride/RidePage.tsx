@@ -436,14 +436,54 @@ interface AgentDetails {
   lastDeliveryAt: string | null
 }
 
-function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+// ── Shared bits ───────────────────────────────────────────────────────────────
+
+function ModalShell({ children, onClose, wide }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-2">
-      <span className="text-sm text-slate-500">{label}</span>
-      <span className="text-right text-sm font-medium text-slate-900 dark:text-slate-100">{value ?? '—'}</span>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
+      <div
+        className={`w-full ${wide ? 'max-w-lg' : 'max-w-md'} max-h-[90vh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl dark:bg-slate-900 sm:rounded-2xl`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
     </div>
   )
 }
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mb-1 mt-5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      {children}
+    </p>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <span className="text-sm text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-right text-sm font-semibold text-slate-900 dark:text-slate-100">
+        {value ?? <span className="font-normal text-slate-300 dark:text-slate-600">—</span>}
+      </span>
+    </div>
+  )
+}
+
+function StatusPill({ ok, okText, badText }: { ok: boolean; okText: string; badText: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+      ok
+        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
+        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+    }`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+      {ok ? okText : badText}
+    </span>
+  )
+}
+
+// ── Rider Details Modal ───────────────────────────────────────────────────────
 
 function RiderDetailsModal({ agent, onClose }: { agent: RideAgent; onClose: () => void }) {
   const [details, setDetails] = useState<AgentDetails | null>(null)
@@ -467,74 +507,105 @@ function RiderDetailsModal({ agent, onClose }: { agent: RideAgent; onClose: () =
 
   const d = details
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Rider details</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}>✕</Button>
+    <ModalShell onClose={onClose} wide>
+      {/* Header */}
+      <div className="flex items-center gap-4 border-b border-slate-100 p-5 dark:border-slate-800">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-xl font-extrabold text-white shadow-md">
+          {agent.fullName.charAt(0).toUpperCase()}
         </div>
-
-        {loading ? (
-          <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-brand-600" /></div>
-        ) : error ? (
-          <p className="py-6 text-sm text-red-500">{error}</p>
-        ) : d ? (
-          <>
-            {/* Live status strip */}
-            <div className="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-              <span className={`h-2.5 w-2.5 rounded-full ${d.isOnline ? 'animate-pulse bg-green-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
-              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {d.isOnline ? 'Online now' : 'Offline'}
-              </span>
-              <span className="ml-auto text-xs text-slate-400">Last seen {timeAgo(d.lastLocationAt)}</span>
-            </div>
-
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {[
-                { label: 'Completed', value: d.completedDeliveries },
-                { label: 'Active', value: d.activeDeliveries },
-                { label: 'Today', value: d.deliveriesToday },
-              ].map((s) => (
-                <div key={s.label} className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/60">
-                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{s.value}</p>
-                  <p className="text-[11px] text-slate-500">{s.label}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
-              <DetailRow label="Full name" value={d.fullName} />
-              <DetailRow label="Agent code" value={<span className="font-mono">{d.agentCode}</span>} />
-              <DetailRow label="Phone" value={d.phone} />
-              <DetailRow label="Account status" value={d.isActive ? 'Active' : 'Deactivated'} />
-              <DetailRow label="Approval" value={d.approvalStatus} />
-              <DetailRow label="Vehicle" value={d.vehicleType} />
-              <DetailRow label="Plate number" value={d.plateNumber} />
-              <DetailRow label="License number" value={d.licenseNumber} />
-              <DetailRow label="National ID" value={d.nationalId} />
-              <DetailRow label="Emergency contact" value={d.emergencyContact} />
-              <DetailRow label="Emergency national ID" value={d.emergencyNationalId} />
-              <DetailRow label="Joined" value={formatDate(d.createdAt)} />
-              <DetailRow label="Last delivery" value={formatDate(d.lastDeliveryAt)} />
-              <DetailRow
-                label="Last location"
-                value={d.lastLat != null && d.lastLng != null
-                  ? `${d.lastLat.toFixed(5)}, ${d.lastLng.toFixed(5)}`
-                  : null}
-              />
-            </div>
-          </>
-        ) : null}
-
-        <div className="mt-5 rounded-xl bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-800/60">
-          Passwords are stored hashed and cannot be viewed. Use "Reset password" from the rider's menu to set a new one.
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-lg font-bold text-slate-900 dark:text-slate-100">{agent.fullName}</h2>
+          <p className="font-mono text-xs text-slate-400">{agent.agentCode}</p>
         </div>
-
-        <div className="mt-4 flex justify-end">
-          <Button variant="outline" onClick={onClose}>Close</Button>
-        </div>
+        <button type="button" onClick={onClose}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
+          ✕
+        </button>
       </div>
-    </div>
+
+      {loading ? (
+        <div className="flex flex-col items-center gap-3 py-14">
+          <Loader2 className="h-7 w-7 animate-spin text-brand-600" />
+          <p className="text-sm text-slate-400">Loading rider profile…</p>
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center gap-3 py-14">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">{error}</p>
+          <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
+        </div>
+      ) : d ? (
+        <div className="px-5 pb-5">
+          {/* Status + stats */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <StatusPill ok={d.isOnline} okText="Online now" badText="Offline" />
+            <StatusPill ok={d.isActive} okText="Account active" badText="Deactivated" />
+            <StatusPill ok={d.approvalStatus === 'APPROVED'} okText="Approved" badText={d.approvalStatus || 'Pending'} />
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {[
+              { label: 'Completed', value: d.completedDeliveries, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300' },
+              { label: 'Active now', value: d.activeDeliveries, icon: Bike, color: 'text-sky-600 bg-sky-50 dark:bg-sky-950/40 dark:text-sky-300' },
+              { label: 'Today', value: d.deliveriesToday, icon: Clock, color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300' },
+            ].map((s) => (
+              <div key={s.label} className="rounded-xl border border-slate-100 p-3 text-center dark:border-slate-800">
+                <span className={`mx-auto flex h-8 w-8 items-center justify-center rounded-lg ${s.color}`}>
+                  <s.icon className="h-4 w-4" />
+                </span>
+                <p className="mt-1.5 text-lg font-bold text-slate-900 dark:text-slate-100">{s.value}</p>
+                <p className="text-[11px] text-slate-500">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Sections */}
+          <SectionTitle>Contact</SectionTitle>
+          <div className="rounded-xl border border-slate-100 px-4 dark:border-slate-800">
+            <DetailRow label="Phone" value={d.phone} />
+            <DetailRow label="Joined" value={formatDate(d.createdAt)} />
+            <DetailRow label="Last seen" value={timeAgo(d.lastLocationAt)} />
+            <DetailRow label="Last delivery" value={formatDate(d.lastDeliveryAt)} />
+          </div>
+
+          <SectionTitle>Vehicle & license</SectionTitle>
+          <div className="rounded-xl border border-slate-100 px-4 dark:border-slate-800">
+            <DetailRow label="Vehicle" value={d.vehicleType} />
+            <DetailRow label="Plate number" value={d.plateNumber} />
+            <DetailRow label="License number" value={d.licenseNumber} />
+            <DetailRow label="National ID" value={d.nationalId} />
+          </div>
+
+          <SectionTitle>Emergency contact</SectionTitle>
+          <div className="rounded-xl border border-slate-100 px-4 dark:border-slate-800">
+            <DetailRow label="Contact" value={d.emergencyContact} />
+            <DetailRow label="National ID" value={d.emergencyNationalId} />
+          </div>
+
+          <SectionTitle>Location</SectionTitle>
+          <div className="rounded-xl border border-slate-100 px-4 dark:border-slate-800">
+            <DetailRow
+              label="Last GPS"
+              value={d.lastLat != null && d.lastLng != null
+                ? <span className="font-mono text-xs">{d.lastLat.toFixed(5)}, {d.lastLng.toFixed(5)}</span>
+                : null}
+            />
+          </div>
+
+          {/* Password note */}
+          <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-950/30">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+              Passwords are stored hashed and cannot be viewed. Use <span className="font-semibold">"Reset password"</span> from the rider's menu to set a new one.
+            </p>
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+          </div>
+        </div>
+      ) : null}
+    </ModalShell>
   )
 }
 
@@ -545,6 +616,7 @@ function ResetPasswordModal({ agent, onClose }: { agent: RideAgent; onClose: () 
   const [customPassword, setCustomPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const submit = async () => {
     setSaving(true)
@@ -560,49 +632,92 @@ function ResetPasswordModal({ agent, onClose }: { agent: RideAgent; onClose: () 
     }
   }
 
-  const copyPassword = () => {
+  const copyPassword = async () => {
     if (!result) return
-    navigator.clipboard.writeText(result)
-    alert({ variant: 'success', message: 'Password copied' })
+    try {
+      await navigator.clipboard.writeText(result)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (_) {
+      alert({ variant: 'error', message: 'Could not copy — select and copy manually' })
+    }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Reset password</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Set a new sign-in password for <span className="font-semibold">{agent.fullName}</span> ({agent.agentCode}).
-        </p>
+    <ModalShell onClose={onClose}>
+      {/* Header */}
+      <div className="flex items-center gap-4 border-b border-slate-100 p-5 dark:border-slate-800">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-md">
+          <KeyRound className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Reset password</h2>
+          <p className="truncate text-xs text-slate-400">
+            {agent.fullName} · <span className="font-mono">{agent.agentCode}</span>
+          </p>
+        </div>
+        <button type="button" onClick={onClose}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
+          ✕
+        </button>
+      </div>
 
+      <div className="p-5">
         {result ? (
-          <div className="mt-5">
-            <p className="text-sm text-slate-500">New password — shown only once, save it now:</p>
+          /* Success state */
+          <div className="text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300">
+              <CheckCircle2 className="h-7 w-7" />
+            </div>
+            <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-slate-100">Password reset</h3>
+            <p className="mt-1 text-sm text-slate-500">New password for {agent.fullName} — shown only once:</p>
+
             <button type="button" onClick={copyPassword}
-              className="mt-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm font-bold text-slate-900 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-              {result}<Copy className="h-4 w-4" />
+              className="mt-4 flex w-full items-center justify-between gap-3 rounded-xl border-2 border-dashed border-brand-300 bg-brand-50 px-4 py-3.5 font-mono text-base font-bold tracking-wider text-brand-800 transition hover:border-brand-400 hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-200">
+              {result}
+              {copied
+                ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                : <Copy className="h-5 w-5" />}
             </button>
-            <p className="mt-2 text-xs text-amber-600">The rider must use this password on their next sign-in.</p>
+            {copied && <p className="mt-1.5 text-xs font-semibold text-emerald-600">Copied to clipboard</p>}
+
+            <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left dark:border-amber-900/50 dark:bg-amber-950/30">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                Share this password with the rider securely. They must use it on their next sign-in — it cannot be viewed again.
+              </p>
+            </div>
+
+            <Button className="mt-4 w-full" onClick={onClose}>Done</Button>
           </div>
         ) : (
-          <div className="mt-5">
-            <Label htmlFor="newPassword">New password (optional)</Label>
-            <Input id="newPassword" type="text" value={customPassword}
-              onChange={(e) => setCustomPassword(e.target.value)}
-              placeholder="Leave empty to auto-generate" className="mt-1" minLength={6} />
-            <p className="mt-1 text-xs text-slate-400">Minimum 6 characters. A temporary password is generated if left blank.</p>
-          </div>
-        )}
+          /* Form state */
+          <>
+            <div className="mt-1 flex items-start gap-2.5 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-900/50 dark:bg-sky-950/30">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-sky-500" />
+              <p className="text-xs leading-relaxed text-sky-700 dark:text-sky-300">
+                This immediately replaces the rider's current password. Their existing sessions stay valid until they sign in again.
+              </p>
+            </div>
 
-        <div className="mt-6 flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose} disabled={saving}>Close</Button>
-          {!result && (
-            <Button onClick={submit} disabled={saving}>
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
-              Reset password
-            </Button>
-          )}
-        </div>
+            <div className="mt-4">
+              <Label htmlFor="newPassword">New password (optional)</Label>
+              <Input id="newPassword" type="text" value={customPassword}
+                onChange={(e) => setCustomPassword(e.target.value)}
+                placeholder="Leave empty to auto-generate" className="mt-1.5" minLength={6} />
+              <p className="mt-1.5 text-xs text-slate-400">Minimum 6 characters. A secure temporary password is generated if left blank.</p>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+              <Button onClick={submit} disabled={saving}>
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                Reset password
+              </Button>
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </ModalShell>
   )
 }
