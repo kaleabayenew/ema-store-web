@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Bike, CheckCircle2, Clock, Copy, Loader2, MapPin, MoreHorizontal,
+  Bike, CheckCircle2, Clock, Copy, Eye, KeyRound, Loader2, MapPin, MoreHorizontal,
   Phone, Plus, RefreshCw, Search, UserX, UserCheck, AlertCircle,
 } from 'lucide-react'
 
@@ -86,6 +86,8 @@ export function RidePage() {
   const [search, setSearch]   = useState('')
   const [filter, setFilter]   = useState<StatusFilter>('All')
   const [showAdd, setShowAdd] = useState(false)
+  const [viewAgent, setViewAgent]     = useState<RideAgent | null>(null)
+  const [resetAgent, setResetAgent]   = useState<RideAgent | null>(null)
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -288,6 +290,12 @@ export function RidePage() {
                           <DropdownMenuItem onClick={() => copyCode(a.agentCode)}>
                             <Copy className="mr-2 h-4 w-4" />Copy agent code
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setViewAgent(a)}>
+                            <Eye className="mr-2 h-4 w-4" />View details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setResetAgent(a)}>
+                            <KeyRound className="mr-2 h-4 w-4" />Reset password
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => toggleStatus(a)}>
                             {a.isActive
                               ? <><UserX className="mr-2 h-4 w-4" />Deactivate rider</>
@@ -317,6 +325,19 @@ export function RidePage() {
         <AddRiderModal
           onClose={() => setShowAdd(false)}
           onCreated={async () => { setShowAdd(false); await fetchAgents() }}
+        />
+      )}
+
+      {/* ── Rider details modal ── */}
+      {viewAgent && (
+        <RiderDetailsModal agent={viewAgent} onClose={() => setViewAgent(null)} />
+      )}
+
+      {/* ── Reset password modal ── */}
+      {resetAgent && (
+        <ResetPasswordModal
+          agent={resetAgent}
+          onClose={() => setResetAgent(null)}
         />
       )}
     </div>
@@ -383,6 +404,203 @@ function AddRiderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
             Create rider
           </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Rider Details Modal ───────────────────────────────────────────────────────
+
+interface AgentDetails {
+  id: string
+  agentCode: string
+  fullName: string
+  phone: string | null
+  isActive: boolean
+  createdAt: string
+  nationalId: string | null
+  licenseNumber: string | null
+  vehicleType: string | null
+  plateNumber: string | null
+  emergencyContact: string | null
+  emergencyNationalId: string | null
+  approvalStatus: string
+  isOnline: boolean
+  lastLat: number | null
+  lastLng: number | null
+  lastLocationAt: string | null
+  completedDeliveries: number
+  activeDeliveries: number
+  deliveriesToday: number
+  lastDeliveryAt: string | null
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2">
+      <span className="text-sm text-slate-500">{label}</span>
+      <span className="text-right text-sm font-medium text-slate-900 dark:text-slate-100">{value ?? '—'}</span>
+    </div>
+  )
+}
+
+function RiderDetailsModal({ agent, onClose }: { agent: RideAgent; onClose: () => void }) {
+  const [details, setDetails] = useState<AgentDetails | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await api.get(`/admin/agents/${agent.id}`)
+        if (!cancelled) setDetails(res.data.agent ?? null)
+      } catch (err: any) {
+        if (!cancelled) setError(err.response?.data?.message ?? 'Failed to load rider details')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [agent.id])
+
+  const d = details
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Rider details</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}>✕</Button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-brand-600" /></div>
+        ) : error ? (
+          <p className="py-6 text-sm text-red-500">{error}</p>
+        ) : d ? (
+          <>
+            {/* Live status strip */}
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+              <span className={`h-2.5 w-2.5 rounded-full ${d.isOnline ? 'animate-pulse bg-green-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {d.isOnline ? 'Online now' : 'Offline'}
+              </span>
+              <span className="ml-auto text-xs text-slate-400">Last seen {timeAgo(d.lastLocationAt)}</span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[
+                { label: 'Completed', value: d.completedDeliveries },
+                { label: 'Active', value: d.activeDeliveries },
+                { label: 'Today', value: d.deliveriesToday },
+              ].map((s) => (
+                <div key={s.label} className="rounded-xl bg-slate-50 p-3 text-center dark:bg-slate-800/60">
+                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100">{s.value}</p>
+                  <p className="text-[11px] text-slate-500">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
+              <DetailRow label="Full name" value={d.fullName} />
+              <DetailRow label="Agent code" value={<span className="font-mono">{d.agentCode}</span>} />
+              <DetailRow label="Phone" value={d.phone} />
+              <DetailRow label="Account status" value={d.isActive ? 'Active' : 'Deactivated'} />
+              <DetailRow label="Approval" value={d.approvalStatus} />
+              <DetailRow label="Vehicle" value={d.vehicleType} />
+              <DetailRow label="Plate number" value={d.plateNumber} />
+              <DetailRow label="License number" value={d.licenseNumber} />
+              <DetailRow label="National ID" value={d.nationalId} />
+              <DetailRow label="Emergency contact" value={d.emergencyContact} />
+              <DetailRow label="Emergency national ID" value={d.emergencyNationalId} />
+              <DetailRow label="Joined" value={formatDate(d.createdAt)} />
+              <DetailRow label="Last delivery" value={formatDate(d.lastDeliveryAt)} />
+              <DetailRow
+                label="Last location"
+                value={d.lastLat != null && d.lastLng != null
+                  ? `${d.lastLat.toFixed(5)}, ${d.lastLng.toFixed(5)}`
+                  : null}
+              />
+            </div>
+          </>
+        ) : null}
+
+        <div className="mt-5 rounded-xl bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-800/60">
+          Passwords are stored hashed and cannot be viewed. Use "Reset password" from the rider's menu to set a new one.
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Reset Password Modal ──────────────────────────────────────────────────────
+
+function ResetPasswordModal({ agent, onClose }: { agent: RideAgent; onClose: () => void }) {
+  const alert = useAlert()
+  const [customPassword, setCustomPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [result, setResult] = useState<string | null>(null)
+
+  const submit = async () => {
+    setSaving(true)
+    try {
+      const res = await api.post(`/admin/agents/${agent.id}/reset-password`, {
+        password: customPassword.trim() || undefined,
+      })
+      setResult(res.data.temporaryPassword)
+    } catch (err: any) {
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to reset password' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const copyPassword = () => {
+    if (!result) return
+    navigator.clipboard.writeText(result)
+    alert({ variant: 'success', message: 'Password copied' })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Reset password</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Set a new sign-in password for <span className="font-semibold">{agent.fullName}</span> ({agent.agentCode}).
+        </p>
+
+        {result ? (
+          <div className="mt-5">
+            <p className="text-sm text-slate-500">New password — shown only once, save it now:</p>
+            <button type="button" onClick={copyPassword}
+              className="mt-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm font-bold text-slate-900 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+              {result}<Copy className="h-4 w-4" />
+            </button>
+            <p className="mt-2 text-xs text-amber-600">The rider must use this password on their next sign-in.</p>
+          </div>
+        ) : (
+          <div className="mt-5">
+            <Label htmlFor="newPassword">New password (optional)</Label>
+            <Input id="newPassword" type="text" value={customPassword}
+              onChange={(e) => setCustomPassword(e.target.value)}
+              placeholder="Leave empty to auto-generate" className="mt-1" minLength={6} />
+            <p className="mt-1 text-xs text-slate-400">Minimum 6 characters. A temporary password is generated if left blank.</p>
+          </div>
+        )}
+
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Close</Button>
+          {!result && (
+            <Button onClick={submit} disabled={saving}>
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+              Reset password
+            </Button>
+          )}
         </div>
       </div>
     </div>
