@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   Building2, CheckCircle2, Clock, Star, Search, MoreHorizontal, Loader2, AlertCircle,
-  ChevronLeft, ChevronRight, Eye, Clipboard, Phone, Ban, ShieldCheck,
+  ChevronLeft, ChevronRight, Eye, Clipboard, Phone, Ban, ShieldCheck, KeyRound, Copy,
 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -85,6 +85,7 @@ export function PartnersPage() {
   const [selected, setSelected]     = useState<PartnerDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
+  const [resetTarget, setResetTarget] = useState<Partner | null>(null)
 
   const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0, avgRating: 0 })
 
@@ -330,6 +331,9 @@ export function PartnersPage() {
                         <DropdownMenuItem onClick={() => navigator.clipboard.writeText(p.id)}>
                           <Clipboard className="mr-2 h-4 w-4" />Copy partner ID
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setResetTarget(p)}>
+                          <KeyRound className="mr-2 h-4 w-4" />Reset password
+                        </DropdownMenuItem>
                         {isSuperAdmin && (
                           <>
                             <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
@@ -518,6 +522,135 @@ export function PartnersPage() {
           </div>
         </div>
       )}
+
+      {/* ── Reset Password Modal ── */}
+      {resetTarget && (
+        <PartnerResetPasswordModal partner={resetTarget} onClose={() => setResetTarget(null)} />
+      )}
+    </div>
+  )
+}
+
+// ── Reset Password Modal ──────────────────────────────────────────────────────
+
+function PartnerResetPasswordModal({ partner, onClose }: { partner: Partner; onClose: () => void }) {
+  const alert = useAlert()
+  const [customPassword, setCustomPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [result, setResult] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const submit = async () => {
+    setSaving(true)
+    try {
+      const res = await api.post(`/admin/partners/${partner.id}/reset-password`, {
+        password: customPassword.trim() || undefined,
+      })
+      setResult(res.data.temporaryPassword)
+    } catch (err: any) {
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to reset password' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const copyPassword = async () => {
+    if (!result) return
+    try {
+      await navigator.clipboard.writeText(result)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (_) {
+      alert({ variant: 'error', message: 'Could not copy — select and copy manually' })
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+        {/* Header */}
+        <div className="flex items-center gap-4 border-b border-slate-100 p-5 dark:border-slate-800">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 text-white shadow-md">
+            <KeyRound className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Reset password</h2>
+            <p className="truncate text-xs text-slate-400">
+              {partner.shop} · {partner.owner}
+              {partner.phone ? ` · ${partner.phone}` : ''}
+            </p>
+          </div>
+          <button type="button" onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
+            ✕
+          </button>
+        </div>
+
+        <div className="p-5">
+          {result ? (
+            /* Success state */
+            <div className="text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300">
+                <CheckCircle2 className="h-7 w-7" />
+              </div>
+              <h3 className="mt-3 text-base font-bold text-slate-900 dark:text-slate-100">Password reset</h3>
+              <p className="mt-1 text-sm text-slate-500">New password for {partner.shop} — shown only once:</p>
+
+              <button type="button" onClick={copyPassword}
+                className="mt-4 flex w-full items-center justify-between gap-3 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 px-4 py-3.5 font-mono text-base font-bold tracking-wider text-amber-800 transition hover:border-amber-400 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                {result}
+                {copied
+                  ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  : <Copy className="h-5 w-5" />}
+              </button>
+              {copied && <p className="mt-1.5 text-xs font-semibold text-emerald-600">Copied to clipboard</p>}
+
+              <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left dark:border-amber-900/50 dark:bg-amber-950/30">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                  Share this password with the partner securely. They must use it on their next sign-in — it cannot be viewed again.
+                </p>
+              </div>
+
+              <Button className="mt-4 w-full" onClick={onClose}>Done</Button>
+            </div>
+          ) : (
+            /* Form state */
+            <>
+              <div className="mt-1 flex items-start gap-2.5 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-900/50 dark:bg-sky-950/30">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-sky-500" />
+                <p className="text-xs leading-relaxed text-sky-700 dark:text-sky-300">
+                  This immediately replaces the partner's current password. Their existing sessions stay valid until they sign in again.
+                </p>
+              </div>
+
+              <div className="mt-4">
+                <label htmlFor="partnerNewPassword" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  New password (optional)
+                </label>
+                <input
+                  id="partnerNewPassword"
+                  type="text"
+                  value={customPassword}
+                  onChange={(e) => setCustomPassword(e.target.value)}
+                  placeholder="Leave empty to auto-generate"
+                  minLength={6}
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                />
+                <p className="mt-1.5 text-xs text-slate-400">Minimum 6 characters. A secure temporary password is generated if left blank.</p>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+                <Button onClick={submit} disabled={saving} className="bg-amber-600 hover:bg-amber-700">
+                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                  Reset password
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
