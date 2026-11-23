@@ -15,6 +15,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   '/bids': ['SUPER_ADMIN', 'MANAGEMENT'],
   '/support': ['SUPER_ADMIN', 'ADMIN', 'MANAGEMENT', 'CUSTOMER_SUPPORT'],
   '/finance': ['SUPER_ADMIN', 'FINANCE'],
+  '/balance': ['SUPER_ADMIN', 'FINANCE', 'MANAGEMENT'],
   '/credits': ['SUPER_ADMIN', 'MANAGEMENT', 'FINANCE'],
   '/reports': ['SUPER_ADMIN', 'PARTNER_MANAGER', 'PRODUCT_MANAGER', 'FINANCE'],
   '/delivery': ['SUPER_ADMIN'],
@@ -54,7 +55,7 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
   CUSTOMER_SUPPORT: ['dashboard', 'customers', 'support'],
   PARTNER_MANAGER: ['dashboard', 'partners', 'reports', 'approvals'],
   PRODUCT_MANAGER: ['dashboard', 'products', 'orders', 'reports', 'approvals'],
-  FINANCE: ['dashboard', 'orders', 'finance', 'reports'],
+  FINANCE: ['dashboard', 'orders', 'finance', 'balance', 'reports'],
   MARKETING: ['dashboard', 'marketing', 'flash-deals', 'seasonal-promotions', 'banners', 'notifications'],
 }
 

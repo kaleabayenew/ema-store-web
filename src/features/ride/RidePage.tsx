@@ -88,6 +88,7 @@ export function RidePage() {
   const [showAdd, setShowAdd] = useState(false)
   const [viewAgent, setViewAgent]     = useState<RideAgent | null>(null)
   const [resetAgent, setResetAgent]   = useState<RideAgent | null>(null)
+  const [tab, setTab]                 = useState<'riders' | 'fees'>('riders')
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -185,6 +186,24 @@ export function RidePage() {
           </Button>
         </div>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2">
+        {([
+          { key: 'riders' as const, label: 'Riders' },
+          { key: 'fees' as const, label: 'Delivery Fees' },
+        ]).map((t) => (
+          <button key={t.key} type="button" onClick={() => setTab(t.key)}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${tab === t.key ? 'bg-brand-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'fees' ? (
+        <DeliveryFeePanel />
+      ) : (
+      <>
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -319,6 +338,8 @@ export function RidePage() {
         </div>
         <div className="border-t border-slate-200 px-4 py-3 text-sm text-slate-500 dark:border-slate-800">Showing {filtered.length} of {agents.length} riders</div>
       </div>
+      </>
+      )}
 
       {/* ── Add Rider Modal ── */}
       {showAdd && (
@@ -719,5 +740,153 @@ function ResetPasswordModal({ agent, onClose }: { agent: RideAgent; onClose: () 
         )}
       </div>
     </ModalShell>
+  )
+}
+
+// ── Delivery Fee Settings Panel ───────────────────────────────────────────────
+
+interface FeeSettings {
+  baseFeeCents: number
+  freeKm: number
+  perKmCents: number
+  freeWeightGrams: number
+  perKgCents: number
+  fragileSurchargeCents: number
+  bulkyMultiplier: number
+  defaultKm: number
+  roadFactor: number
+  minFeeCents: number
+  maxFeeCents: number
+  serviceFeeCents: number
+  partnerCommissionPct: number
+  riderCommissionPct: number
+}
+
+function DeliveryFeePanel() {
+  const alert = useAlert()
+  const [s, setS] = useState<FeeSettings | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    api.get('/admin/delivery-fee')
+      .then((res) => setS(res.data.settings))
+      .catch((err: any) => alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to load fee settings' }))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-brand-600" /></div>
+  }
+  if (!s) return null
+
+  const set = (k: keyof FeeSettings) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setS({ ...s, [k]: e.target.value === '' ? 0 : Number(e.target.value) })
+
+  // Display helper: cents fields shown in whole birr.
+  const birr = (cents?: number) => (cents ?? 0) / 100
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const res = await api.put('/admin/delivery-fee', {
+        baseFeeCents: s.baseFeeCents,
+        freeKm: s.freeKm,
+        perKmCents: s.perKmCents,
+        freeWeightGrams: s.freeWeightGrams,
+        perKgCents: s.perKgCents,
+        fragileSurchargeCents: s.fragileSurchargeCents,
+        bulkyMultiplier: s.bulkyMultiplier,
+        defaultKm: s.defaultKm,
+        roadFactor: s.roadFactor,
+        minFeeCents: s.minFeeCents,
+        maxFeeCents: s.maxFeeCents,
+        serviceFeeCents: s.serviceFeeCents,
+        partnerCommissionPct: s.partnerCommissionPct,
+        riderCommissionPct: s.riderCommissionPct,
+      })
+      setS(res.data.settings)
+      alert({ variant: 'success', message: 'Delivery fee settings saved' })
+    } catch (err: any) {
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to save settings' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const Field = ({ label, k, suffix, step }: { label: string; k: keyof FeeSettings; suffix?: string; step?: string }) => (
+    <div>
+      <Label className="text-xs text-slate-500">{label}</Label>
+      <div className="mt-1 flex items-center gap-2">
+        <Input type="number" step={step ?? '1'} value={s[k] as number} onChange={set(k)} className="w-32" />
+        {suffix && <span className="text-xs text-slate-400">{suffix}</span>}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-3">
+      {/* Formula explainer */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:col-span-1">
+        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">How the fee is calculated</h2>
+        <div className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+          <p><span className="font-semibold">fee = base + km×rate + kg×rate + fragile − caps</span></p>
+          <ul className="list-disc space-y-1 pl-5 text-xs text-slate-500">
+            <li>Distance: shop pin → customer pin (or subcity estimate), road factor applied.</li>
+            <li>Weight &amp; material guessed from product names (no extra fields needed).</li>
+            <li>Customer pays the fee + a flat service fee at checkout; the rider earns the fee minus their commission.</li>
+            <li>Coupons discount products only — never the delivery fee.</li>
+          </ul>
+        </div>
+        <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-800/60">
+          Example: phone order, 4 km trip, 0.3 kg → base {birr(s.baseFeeCents)} + {(4 - s.freeKm).toFixed(1)} km × {birr(s.perKmCents)} + fragile {birr(s.fragileSurchargeCents)} ≈ <span className="font-bold text-slate-700 dark:text-slate-200">{birr(Math.min(s.maxFeeCents, Math.max(s.minFeeCents, s.baseFeeCents + Math.max(0, 4 - s.freeKm) * s.perKmCents + s.fragileSurchargeCents)))} ETB</span>
+        </div>
+      </div>
+
+      {/* Settings form */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:col-span-2">
+        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Rates</h2>
+
+        <p className="mt-4 text-xs font-bold uppercase tracking-wide text-slate-400">Base &amp; distance</p>
+        <div className="mt-2 grid gap-4 sm:grid-cols-3">
+          <Field label="Base fee (cents)" k="baseFeeCents" suffix={`= ${birr(s.baseFeeCents)} ETB`} />
+          <Field label="Free distance (km)" k="freeKm" step="0.5" />
+          <Field label="Per km (cents)" k="perKmCents" suffix={`= ${birr(s.perKmCents)} ETB/km`} />
+          <Field label="Default km (no pin)" k="defaultKm" step="0.5" />
+          <Field label="Road factor" k="roadFactor" step="0.05" />
+        </div>
+
+        <p className="mt-5 text-xs font-bold uppercase tracking-wide text-slate-400">Weight &amp; material</p>
+        <div className="mt-2 grid gap-4 sm:grid-cols-3">
+          <Field label="Free weight (grams)" k="freeWeightGrams" step="500" />
+          <Field label="Per kg (cents)" k="perKgCents" suffix={`= ${birr(s.perKgCents)} ETB/kg`} />
+          <Field label="Fragile surcharge (cents)" k="fragileSurchargeCents" suffix={`= ${birr(s.fragileSurchargeCents)} ETB/item`} />
+          <Field label="Bulky multiplier" k="bulkyMultiplier" step="0.1" />
+        </div>
+
+        <p className="mt-5 text-xs font-bold uppercase tracking-wide text-slate-400">Limits</p>
+        <div className="mt-2 grid gap-4 sm:grid-cols-3">
+          <Field label="Min fee (cents)" k="minFeeCents" suffix={`= ${birr(s.minFeeCents)} ETB`} />
+          <Field label="Max fee (cents)" k="maxFeeCents" suffix={`= ${birr(s.maxFeeCents)} ETB`} />
+        </div>
+
+        <p className="mt-5 text-xs font-bold uppercase tracking-wide text-slate-400">Platform commissions</p>
+        <div className="mt-2 grid gap-4 sm:grid-cols-3">
+          <Field label="Service fee (cents)" k="serviceFeeCents" suffix={`= ${birr(s.serviceFeeCents)} ETB · paid by customer`} />
+          <Field label="Partner commission (%)" k="partnerCommissionPct" step="0.1" suffix="% of product subtotal" />
+          <Field label="Rider commission (%)" k="riderCommissionPct" step="0.1" suffix="% of delivery fee" />
+        </div>
+        <p className="mt-2 text-xs text-slate-400">
+          Example (phone, 15,000 ETB + 128 ETB fee): platform keeps ≈ {birr(s.serviceFeeCents + Math.round(15000 * s.partnerCommissionPct / 100) + Math.round(12800 * s.riderCommissionPct / 100))} ETB
+        </p>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <Button onClick={save} disabled={saving}>
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+            Save rates
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }

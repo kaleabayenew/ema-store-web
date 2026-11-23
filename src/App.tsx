@@ -33,6 +33,7 @@ import { ProductsPage } from './features/products/ProductsPage'
 import { ReportsPage } from './features/reports/ReportsPage'
 import { ReviewsPage } from './features/reviews/ReviewsPage'
 import { RidePage } from './features/ride/RidePage'
+import { BalancePage } from './features/balance/BalancePage'
 import { SeasonalPromotionsPage } from './features/seasonal-promotions/SeasonalPromotionsPage'
 import { NotFoundPage } from './features/shared/NotFoundPage'
 import { SettingsPage } from './features/settings/SettingsPage'
@@ -97,6 +98,7 @@ function App() {
             <Route path="/support"   element={<SupportPage />} />
             <Route path="/delivery"  element={<DeliveryPage />} />
             <Route path="/finance"   element={<FinancePage />} />
+            <Route path="/balance"   element={<BalancePage />} />
             <Route path="/credits"   element={<CreditPage />} />
             <Route path="/approvals" element={<ApprovalsPage />} />
             <Route path="/banners"   element={<PaymentBannersPage />} />
