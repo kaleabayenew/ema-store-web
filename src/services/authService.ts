@@ -12,8 +12,8 @@ export const KNOWN_ROLES = new Set<Role>([
   'MARKETING',
 ])
 
-function extractMessage(err: any, fallback: string): string {
-  const msg = err?.response?.data?.message
+function extractMessage(err: unknown, fallback: string): string {
+  const msg = (err as { response?: { data?: { message?: unknown } } })?.response?.data?.message
   return typeof msg === 'string' && msg.length > 0 ? msg : fallback
 }
 
@@ -28,32 +28,65 @@ export async function loginWithUsername(payload: LoginPayload): Promise<AuthSess
       timeout: 60000,
     })
 
-    const backendData = response.data
+    const backendData = response.data as {
+      accessToken?: unknown
+      refreshToken?: unknown
+      token?: unknown
+      expiresIn?: unknown
+      requiresOtp?: unknown
+      otpSessionId?: unknown
+      user?: {
+        id?: unknown
+        fullName?: unknown
+        email?: unknown
+        phone?: unknown
+        adminRole?: unknown
+        role?: unknown
+        allowedPages?: unknown
+      }
+    }
 
     // Transform backend response to frontend format.
     // Never default to SUPER_ADMIN — a missing/unknown role fails closed.
-    const rawRole: string | undefined =
-      backendData.user?.adminRole || backendData.user?.role
+    const rawRole = backendData.user?.adminRole || backendData.user?.role
     const role: Role | null = rawRole && KNOWN_ROLES.has(rawRole as Role) ? (rawRole as Role) : null
-    if (!role) {
+    const accessToken =
+      typeof backendData.accessToken === 'string' ? backendData.accessToken :
+      typeof backendData.token === 'string' ? backendData.token : ''
+    const userId = backendData.user?.id
+    if (!role || typeof userId !== 'string' || !userId || !accessToken) {
       throw new Error('Your account does not have admin access.')
     }
 
     const user: UserProfile = {
-      id: backendData.user.id,
-      name: backendData.user.fullName,
-      email: backendData.user.email,
+      id: userId,
+      name: typeof backendData.user?.fullName === 'string' ? backendData.user.fullName : '',
+      email: typeof backendData.user?.email === 'string' ? backendData.user.email : '',
+      phone: typeof backendData.user?.phone === 'string' ? backendData.user.phone : undefined,
       role,
       locale: 'en',
-      allowedPages: backendData.user.allowedPages || [],
+      allowedPages: Array.isArray(backendData.user?.allowedPages)
+        ? backendData.user.allowedPages.filter((page): page is string => typeof page === 'string')
+        : [],
+    }
+
+    const requiresOtp = backendData.requiresOtp === true
+    const otpSessionId =
+      typeof backendData.otpSessionId === 'string' ? backendData.otpSessionId : undefined
+    if (requiresOtp && !otpSessionId) {
+      throw new Error('The server did not create an OTP session. Please try signing in again.')
     }
 
     const session: AuthSession = {
       user,
-      accessToken: backendData.token,
-      refreshToken: backendData.token, // Backend may not return refresh token
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 8).toISOString(),
-      requiresOtp: false, // Admin login may not require OTP
+      accessToken,
+      refreshToken: typeof backendData.refreshToken === 'string' ? backendData.refreshToken : '',
+      expiresAt: new Date(
+        Date.now() +
+          (typeof backendData.expiresIn === 'number' ? backendData.expiresIn : 900) * 1000,
+      ).toISOString(),
+      requiresOtp,
+      otpSessionId,
     }
 
     return session
@@ -75,12 +108,34 @@ export async function verifyOtp({ otp, otpSessionId }: { otp: string; otpSession
   }
 }
 
-export async function requestPasswordReset(email: string) {
+export async function requestPasswordReset(phone: string) {
   try {
-    const response = await api.post('/auth/forgot-password', { email })
+    const response = await api.post('/auth/forgot-password', { phone })
     return response.data
   } catch (err: any) {
     throw new Error(extractMessage(err, 'Could not send reset email. Please try again.'))
+  }
+}
+
+export async function verifyPasswordReset(phone: string, code: string) {
+  try {
+    const response = await api.post('/auth/forgot-password/verify', { phone, code })
+    return response.data
+  } catch (err: unknown) {
+    throw new Error(extractMessage(err, 'Invalid or expired code. Please try again.'))
+  }
+}
+
+export async function resetPassword(phone: string, code: string, newPassword: string) {
+  try {
+    const response = await api.post('/auth/forgot-password/reset', {
+      phone,
+      code,
+      newPassword,
+    })
+    return response.data
+  } catch (err: unknown) {
+    throw new Error(extractMessage(err, 'Could not reset the password. Please try again.'))
   }
 }
 
@@ -89,7 +144,7 @@ export async function refreshAccessToken() {
     // The HttpOnly cookie supplies the refresh token automatically.
     const response = await api.post('/auth/refresh', {})
     return response.data
-  } catch {
-    throw new Error('Failed to refresh token')
+  } catch (err: unknown) {
+    throw new Error(extractMessage(err, 'Failed to refresh token'))
   }
 }

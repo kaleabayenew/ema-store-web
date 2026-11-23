@@ -15,6 +15,10 @@ interface BalanceSummary {
   pendingPayoutsCents: number
   serviceChargesCents: number
   totalPaidOutCents: number
+  pendingPartnerCents: number
+  pendingRiderCents: number
+  platformPendingCents: number
+  escrowHeldCents: number
 }
 
 interface BalanceEntry {
@@ -56,6 +60,10 @@ export function BalancePage() {
           pendingPayoutsCents: s.pendingPayouts ?? 0,
           serviceChargesCents: s.serviceCharges ?? 0,
           totalPaidOutCents: s.totalPaidOutCents ?? 0,
+          pendingPartnerCents: s.pendingPartnerCents ?? 0,
+          pendingRiderCents: s.pendingRiderCents ?? 0,
+          platformPendingCents: s.platformPendingCents ?? 0,
+          escrowHeldCents: s.escrowHeldCents ?? 0,
         })
         setEntries(
           (res.data.entries ?? []).map((e: any) => ({
@@ -130,6 +138,28 @@ export function BalancePage() {
             <p className="mt-4 text-xl font-semibold text-slate-900 dark:text-slate-100">{formatMoney(value)}</p>
           </div>
         ))}
+      </div>
+
+      {/* In-flight orders — money earned/held but not yet settled */}
+      <div>
+        <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">In-flight orders (escrow)</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Pending partner payouts', hint: 'Partner share earned, not yet deposited', value: birr(summary?.pendingPartnerCents ?? 0), icon: ArrowDownLeft, tone: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' },
+            { label: 'Pending rider payouts', hint: 'Rider net earning, not yet deposited', value: birr(summary?.pendingRiderCents ?? 0), icon: ArrowUpRight, tone: 'text-sky-600 bg-sky-50 dark:bg-sky-950/40' },
+            { label: 'Platform cut pending', hint: 'Service fee + commissions on open orders', value: birr(summary?.platformPendingCents ?? 0), icon: Scale, tone: 'text-violet-600 bg-violet-50 dark:bg-violet-950/40' },
+            { label: 'Held in escrow', hint: 'Customer payments for undelivered orders', value: birr(summary?.escrowHeldCents ?? 0), icon: Wallet, tone: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40' },
+          ].map(({ label, hint, value, icon: Icon, tone }) => (
+            <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500">{label}</span>
+                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tone}`}><Icon className="h-4 w-4" /></span>
+              </div>
+              <p className="mt-4 text-xl font-semibold text-slate-900 dark:text-slate-100">{formatMoney(value)}</p>
+              <p className="mt-1 text-xs text-slate-400">{hint}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Ledger */}

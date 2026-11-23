@@ -30,6 +30,7 @@ import { NotificationsPage } from './features/notifications/NotificationsPage'
 import { OrdersPage } from './features/orders/OrdersPage'
 import { PartnersPage } from './features/partners/PartnersPage'
 import { ProductsPage } from './features/products/ProductsPage'
+import { ProfilePage } from './features/profile/ProfilePage'
 import { ReportsPage } from './features/reports/ReportsPage'
 import { ReviewsPage } from './features/reviews/ReviewsPage'
 import { RidePage } from './features/ride/RidePage'
@@ -116,12 +117,7 @@ function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/settings/audit-log" element={<SettingsPage />} />
 
-            {/* Profile placeholder */}
-            <Route path="/profile" element={
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-                Profile page coming soon
-              </div>
-            } />
+            <Route path="/profile" element={<ProfilePage />} />
 
             {/* Catch-all — unknown URLs show 404 inside the layout */}
             <Route path="*" element={<NotFoundPage />} />

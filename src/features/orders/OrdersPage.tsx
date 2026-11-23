@@ -229,6 +229,25 @@ export function OrdersPage() {
     }
   }
 
+  async function confirmPayment(orderId: string) {
+    const ok = await confirmDialog({
+      title: 'Confirm payment',
+      message: `Mark order ${shortId(orderId)} as paid? Only do this after verifying the ${detail?.paymentMethod ?? 'online'} transaction.`,
+      confirmText: 'Confirm paid',
+    })
+    if (!ok) return
+    setUpdatingStatus(true)
+    try {
+      await api.patch(`/orders/admin/${orderId}/payment`)
+      fetchOrders()
+      if (detail?.id === orderId) setDetail((d) => d ? { ...d, paymentStatus: 'PAID' } : null)
+    } catch (err: any) {
+      alert({ variant: 'error', message: err.response?.data?.message ?? 'Failed to confirm payment' })
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
   if (loading && orders.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -462,6 +481,27 @@ export function OrdersPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Confirm online payment — required before delivery can settle */}
+              {isAdmin && detail.paymentStatus !== 'PAID' && detail.status !== 'CANCELLED' && detail.status !== 'DELIVERED' && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Payment not confirmed</p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        {detail.paymentMethod} · ref: {detail.paymentId || '—'} — verify the transaction, then confirm.
+                      </p>
+                    </div>
+                    <button
+                      disabled={updatingStatus}
+                      onClick={() => confirmPayment(detail.id)}
+                      className="rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                    >
+                      Confirm paid
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Update status — admins only */}
               {isAdmin && (

@@ -40,7 +40,10 @@ export const useAuthStore = create<AuthStore>()((set) => ({
       isAuthenticated: true,
       sessionChecked: true,
       sessionExpired: false,
-      pendingOtp: session.requiresOtp ? { email: session.user.email, otpSessionId: session.otpSessionId ?? 'mock-otp-session' } : null,
+      pendingOtp:
+        session.requiresOtp && session.otpSessionId
+          ? { email: session.user.email, otpSessionId: session.otpSessionId }
+          : null,
     }),
   setPendingOtp: (payload) => set({ pendingOtp: payload }),
   clearPendingOtp: () => set({ pendingOtp: null }),
