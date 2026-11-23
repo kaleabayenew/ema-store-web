@@ -758,6 +758,7 @@ interface FeeSettings {
   minFeeCents: number
   maxFeeCents: number
   serviceFeeCents: number
+  serviceFeeExtraLegPct: number
   partnerCommissionPct: number
   riderCommissionPct: number
 }
@@ -802,6 +803,7 @@ function DeliveryFeePanel() {
         minFeeCents: s.minFeeCents,
         maxFeeCents: s.maxFeeCents,
         serviceFeeCents: s.serviceFeeCents,
+        serviceFeeExtraLegPct: s.serviceFeeExtraLegPct,
         partnerCommissionPct: s.partnerCommissionPct,
         riderCommissionPct: s.riderCommissionPct,
       })
@@ -872,7 +874,8 @@ function DeliveryFeePanel() {
 
         <p className="mt-5 text-xs font-bold uppercase tracking-wide text-slate-400">Platform commissions</p>
         <div className="mt-2 grid gap-4 sm:grid-cols-3">
-          <Field label="Service fee (cents)" k="serviceFeeCents" suffix={`= ${birr(s.serviceFeeCents)} ETB · paid by customer`} />
+          <Field label="Service fee — 1st shop (cents)" k="serviceFeeCents" suffix={`= ${birr(s.serviceFeeCents)} ETB · paid by customer`} />
+          <Field label="Extra shop leg (%)" k="serviceFeeExtraLegPct" step="5" suffix="% of base fee per additional shop" />
           <Field label="Partner commission (%)" k="partnerCommissionPct" step="0.1" suffix="% of product subtotal" />
           <Field label="Rider commission (%)" k="riderCommissionPct" step="0.1" suffix="% of delivery fee" />
         </div>

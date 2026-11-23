@@ -14,6 +14,7 @@ interface BalanceSummary {
   partnerRevenueCents: number
   pendingPayoutsCents: number
   serviceChargesCents: number
+  totalPaidOutCents: number
 }
 
 interface BalanceEntry {
@@ -54,6 +55,7 @@ export function BalancePage() {
           partnerRevenueCents: s.partnerRevenue ?? 0,
           pendingPayoutsCents: s.pendingPayouts ?? 0,
           serviceChargesCents: s.serviceCharges ?? 0,
+          totalPaidOutCents: s.totalPaidOutCents ?? 0,
         })
         setEntries(
           (res.data.entries ?? []).map((e: any) => ({
@@ -93,6 +95,7 @@ export function BalancePage() {
     { label: 'Partner revenue (net)', value: birr(summary?.partnerRevenueCents ?? 0), icon: ArrowDownLeft, tone: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' },
     { label: 'Pending payouts', value: birr(summary?.pendingPayoutsCents ?? 0), icon: Scale, tone: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40' },
     { label: 'Service charges', value: birr(summary?.serviceChargesCents ?? 0), icon: Scale, tone: 'text-violet-600 bg-violet-50 dark:bg-violet-950/40' },
+    { label: 'Paid out to partners/riders', value: birr(summary?.totalPaidOutCents ?? 0), icon: ArrowDownLeft, tone: 'text-teal-600 bg-teal-50 dark:bg-teal-950/40' },
   ]
 
   return (
@@ -117,7 +120,7 @@ export function BalancePage() {
       )}
 
       {/* Summary cards */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {cards.map(({ label, value, icon: Icon, tone }) => (
           <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-center justify-between">
