@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
-import { Wallet, ArrowDownLeft, ArrowUpRight, Loader2, AlertCircle, Scale } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  Wallet, ArrowDownLeft, ArrowUpRight, Loader2, AlertCircle, Scale,
+  X, ChevronLeft, ChevronRight, Users,
+} from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import api from '@/lib/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-// TODO: replace with the real balance/ledger payload once the logic is defined.
 
 interface BalanceSummary {
   platformBalanceCents: number
@@ -30,6 +32,31 @@ interface BalanceEntry {
   createdAt: string
 }
 
+interface BreakdownRow {
+  name: string
+  detail: string
+  amountCents: number
+  orders: number
+}
+
+interface BreakdownResponse {
+  card: string
+  page: number
+  limit: number
+  total: number
+  pages: number
+  rows: BreakdownRow[]
+}
+
+interface CardDef {
+  key: string
+  label: string
+  hint?: string
+  valueCents: number
+  icon: any
+  tone: string
+}
+
 function formatMoney(n: number) {
   return `ETB ${n.toLocaleString('en-ET', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
@@ -38,6 +65,8 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-ET', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+const PAGE_SIZE = 8
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function BalancePage() {
@@ -45,6 +74,13 @@ export function BalancePage() {
   const [entries, setEntries] = useState<BalanceEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Breakdown popup state
+  const [selectedCard, setSelectedCard] = useState<CardDef | null>(null)
+  const [breakdown, setBreakdown] = useState<BreakdownResponse | null>(null)
+  const [breakdownLoading, setBreakdownLoading] = useState(false)
+  const [breakdownError, setBreakdownError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   const fetchBalance = async () => {
     setLoading(true)
@@ -88,6 +124,42 @@ export function BalancePage() {
 
   useEffect(() => { fetchBalance() }, [])
 
+  const fetchBreakdown = useCallback(async (cardKey: string, p: number) => {
+    setBreakdownLoading(true)
+    setBreakdownError(null)
+    try {
+      const res = await api.get('/admin/balance/breakdown', {
+        params: { card: cardKey, page: p, limit: PAGE_SIZE },
+      })
+      setBreakdown(res.data as BreakdownResponse)
+    } catch (err: any) {
+      setBreakdownError(err.response?.data?.message ?? 'Failed to load details')
+      setBreakdown(null)
+    } finally {
+      setBreakdownLoading(false)
+    }
+  }, [])
+
+  const openCard = (card: CardDef) => {
+    setSelectedCard(card)
+    setPage(1)
+    setBreakdown(null)
+    fetchBreakdown(card.key, 1)
+  }
+
+  const goToPage = (p: number) => {
+    if (!selectedCard) return
+    const next = Math.min(Math.max(1, p), breakdown?.pages ?? 1)
+    setPage(next)
+    fetchBreakdown(selectedCard.key, next)
+  }
+
+  const closeCard = () => {
+    setSelectedCard(null)
+    setBreakdown(null)
+    setBreakdownError(null)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -96,14 +168,18 @@ export function BalancePage() {
     )
   }
 
-  const birr = (cents: number) => cents / 100
-  const cards = [
-    { label: 'Platform balance', value: birr(summary?.platformBalanceCents ?? 0), icon: Wallet, tone: 'text-brand-600 bg-brand-50 dark:bg-brand-950/40' },
-    { label: 'Rider earnings (net)', value: birr(summary?.riderEarningsCents ?? 0), icon: ArrowUpRight, tone: 'text-sky-600 bg-sky-50 dark:bg-sky-950/40' },
-    { label: 'Partner revenue (net)', value: birr(summary?.partnerRevenueCents ?? 0), icon: ArrowDownLeft, tone: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' },
-    { label: 'Pending payouts', value: birr(summary?.pendingPayoutsCents ?? 0), icon: Scale, tone: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40' },
-    { label: 'Service charges', value: birr(summary?.serviceChargesCents ?? 0), icon: Scale, tone: 'text-violet-600 bg-violet-50 dark:bg-violet-950/40' },
-    { label: 'Paid out to partners/riders', value: birr(summary?.totalPaidOutCents ?? 0), icon: ArrowDownLeft, tone: 'text-teal-600 bg-teal-50 dark:bg-teal-950/40' },
+  const s = summary
+  const cards: CardDef[] = [
+    { key: 'platform', label: 'Platform balance', valueCents: s?.platformBalanceCents ?? 0, icon: Wallet, tone: 'text-brand-600 bg-brand-50 dark:bg-brand-950/40' },
+    { key: 'rider', label: 'Rider earnings (net)', valueCents: s?.riderEarningsCents ?? 0, icon: ArrowUpRight, tone: 'text-sky-600 bg-sky-50 dark:bg-sky-950/40' },
+    { key: 'partner', label: 'Partner revenue (net)', valueCents: s?.partnerRevenueCents ?? 0, icon: ArrowDownLeft, tone: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' },
+    { key: 'pendingPayouts', label: 'Pending payouts', valueCents: s?.pendingPayoutsCents ?? 0, icon: Scale, tone: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40' },
+    { key: 'service', label: 'Service charges', valueCents: s?.serviceChargesCents ?? 0, icon: Scale, tone: 'text-violet-600 bg-violet-50 dark:bg-violet-950/40' },
+    { key: 'paidOut', label: 'Paid out to partners/riders', valueCents: s?.totalPaidOutCents ?? 0, icon: ArrowDownLeft, tone: 'text-teal-600 bg-teal-50 dark:bg-teal-950/40' },
+    { key: 'pendingPartner', label: 'Pending partner payouts', hint: 'Earned on open orders, not yet deposited', valueCents: s?.pendingPartnerCents ?? 0, icon: ArrowDownLeft, tone: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' },
+    { key: 'pendingRider', label: 'Pending rider payouts', hint: 'Rider net earning, not yet deposited', valueCents: s?.pendingRiderCents ?? 0, icon: ArrowUpRight, tone: 'text-sky-600 bg-sky-50 dark:bg-sky-950/40' },
+    { key: 'platformPending', label: 'Platform cut pending', hint: 'Service fee + commissions on open orders', valueCents: s?.platformPendingCents ?? 0, icon: Scale, tone: 'text-violet-600 bg-violet-50 dark:bg-violet-950/40' },
+    { key: 'escrow', label: 'Held in escrow', hint: 'Customer payments for undelivered orders', valueCents: s?.escrowHeldCents ?? 0, icon: Wallet, tone: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40' },
   ]
 
   return (
@@ -113,7 +189,7 @@ export function BalancePage() {
         <div>
           <p className="text-sm font-medium text-brand-600">Ema Store finances</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Balance</h1>
-          <p className="mt-1 text-sm text-slate-500">Order money split between riders, partners and service charges.</p>
+          <p className="mt-1 text-sm text-slate-500">Order money split between riders, partners and service charges. Tap a card for per-person details.</p>
         </div>
         <Button variant="outline" onClick={fetchBalance} disabled={loading}>
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -127,39 +203,22 @@ export function BalancePage() {
         </div>
       )}
 
-      {/* Summary cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {cards.map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      {/* Summary cards — single row, horizontal scroll */}
+      <div className="flex gap-4 overflow-x-auto pb-3 -mx-1 px-1">
+        {cards.map(({ key, label, hint, valueCents, icon: Icon, tone }) => (
+          <button
+            key={key}
+            onClick={() => openCard(cards.find((c) => c.key === key)!)}
+            className="min-w-[210px] flex-shrink-0 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-brand-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-brand-700"
+          >
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">{label}</span>
               <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tone}`}><Icon className="h-4 w-4" /></span>
             </div>
-            <p className="mt-4 text-xl font-semibold text-slate-900 dark:text-slate-100">{formatMoney(value)}</p>
-          </div>
+            <p className="mt-4 text-xl font-semibold text-slate-900 dark:text-slate-100">{formatMoney(valueCents / 100)}</p>
+            {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+          </button>
         ))}
-      </div>
-
-      {/* In-flight orders — money earned/held but not yet settled */}
-      <div>
-        <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">In-flight orders (escrow)</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: 'Pending partner payouts', hint: 'Partner share earned, not yet deposited', value: birr(summary?.pendingPartnerCents ?? 0), icon: ArrowDownLeft, tone: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' },
-            { label: 'Pending rider payouts', hint: 'Rider net earning, not yet deposited', value: birr(summary?.pendingRiderCents ?? 0), icon: ArrowUpRight, tone: 'text-sky-600 bg-sky-50 dark:bg-sky-950/40' },
-            { label: 'Platform cut pending', hint: 'Service fee + commissions on open orders', value: birr(summary?.platformPendingCents ?? 0), icon: Scale, tone: 'text-violet-600 bg-violet-50 dark:bg-violet-950/40' },
-            { label: 'Held in escrow', hint: 'Customer payments for undelivered orders', value: birr(summary?.escrowHeldCents ?? 0), icon: Wallet, tone: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40' },
-          ].map(({ label, hint, value, icon: Icon, tone }) => (
-            <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">{label}</span>
-                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tone}`}><Icon className="h-4 w-4" /></span>
-              </div>
-              <p className="mt-4 text-xl font-semibold text-slate-900 dark:text-slate-100">{formatMoney(value)}</p>
-              <p className="mt-1 text-xs text-slate-400">{hint}</p>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Ledger */}
@@ -189,7 +248,7 @@ export function BalancePage() {
                     <Badge variant={e.type === 'credit' ? 'success' : 'danger'}>{e.type}</Badge>
                   </td>
                   <td className={`px-4 py-3 font-semibold ${e.type === 'credit' ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {e.type === 'credit' ? '+' : '−'}{formatMoney(birr(e.amountCents))}
+                    {e.type === 'credit' ? '+' : '−'}{formatMoney(e.amountCents / 100)}
                   </td>
                   <td className="px-4 py-3 text-slate-500">{formatDate(e.createdAt)}</td>
                 </tr>
@@ -198,6 +257,99 @@ export function BalancePage() {
           </table>
         )}
       </div>
+
+      {/* Per-person breakdown popup */}
+      {selectedCard && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+          onClick={closeCard}
+        >
+          <div
+            className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Popup header */}
+            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-brand-600" />
+                  <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{selectedCard.label}</h2>
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  Total: <span className="font-semibold text-slate-900 dark:text-slate-100">{formatMoney(selectedCard.valueCents / 100)}</span>
+                  {breakdown ? ` · ${breakdown.total} ${breakdown.total === 1 ? 'person' : 'people'}` : ''}
+                </p>
+              </div>
+              <button
+                onClick={closeCard}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Popup body */}
+            <div className="max-h-[55vh] overflow-y-auto px-5 py-4">
+              {breakdownLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
+                </div>
+              ) : breakdownError ? (
+                <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900 dark:bg-red-950/30">
+                  <AlertCircle className="h-4 w-4" />{breakdownError}
+                </div>
+              ) : !breakdown || breakdown.rows.length === 0 ? (
+                <div className="py-12 text-center text-sm text-slate-400">No records for this card yet.</div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left dark:border-slate-800">
+                      {['Name', 'Detail', 'Orders', 'Amount'].map((h) => (
+                        <th key={h} className="pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {breakdown.rows.map((r, i) => (
+                      <tr key={`${r.name}-${i}`} className="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td className="py-2.5 pr-4 font-medium text-slate-900 dark:text-slate-100">{r.name}</td>
+                        <td className="py-2.5 pr-4 text-slate-500">{r.detail || '—'}</td>
+                        <td className="py-2.5 pr-4 text-slate-500">{r.orders}</td>
+                        <td className="py-2.5 font-semibold text-slate-900 dark:text-slate-100">{formatMoney(r.amountCents / 100)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Pagination footer */}
+            {breakdown && breakdown.pages > 1 && (
+              <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3 dark:border-slate-800">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(page - 1)}
+                  disabled={page <= 1 || breakdownLoading}
+                >
+                  <ChevronLeft className="mr-1 h-4 w-4" /> Prev
+                </Button>
+                <span className="text-sm text-slate-500">
+                  Page <span className="font-semibold text-slate-900 dark:text-slate-100">{page}</span> of {breakdown.pages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(page + 1)}
+                  disabled={page >= breakdown.pages || breakdownLoading}
+                >
+                  Next <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
