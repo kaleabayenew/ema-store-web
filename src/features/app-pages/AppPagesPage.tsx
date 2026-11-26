@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Eye, EyeOff, Loader2, Lock, LockOpen, RefreshCw, Store, Smartphone, Wrench } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/PageHeader'
 import api from '@/lib/api'
 import { apiErrorMessage } from '@/lib/errors'
 
@@ -119,24 +120,17 @@ export function AppPagesPage({ app }: { app: AppKind }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400">
-            <Icon className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-brand-600">App Control</p>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-              {meta.label} Pages
-            </h1>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{meta.description}</p>
-          </div>
-        </div>
-        <Button variant="outline" onClick={fetchPages} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="App Control"
+        title={`${meta.label} Pages`}
+        description={meta.description}
+        actions={
+          <Button variant="outline" onClick={fetchPages} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        }
+      />
 
       {/* Maintenance mode */}
       <div className={`overflow-hidden rounded-2xl border shadow-sm ${

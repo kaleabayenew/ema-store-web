@@ -6,6 +6,8 @@ import {
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { StatsCard } from '@/components/ui/StatsCard'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -171,21 +173,21 @@ export function RidePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Ride management</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Ride & Delivery Riders</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchAgents} disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            Refresh
-          </Button>
-          <Button onClick={() => setShowAdd(true)}>
-            <Plus className="mr-2 h-4 w-4" />Add rider
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Ride management"
+        title="Ride & Delivery Riders"
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchAgents} disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Refresh
+            </Button>
+            <Button onClick={() => setShowAdd(true)}>
+              <Plus className="mr-2 h-4 w-4" />Add rider
+            </Button>
+          </>
+        }
+      />
 
       {/* Tabs */}
       <div className="flex gap-2">
@@ -207,14 +209,16 @@ export function RidePage() {
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {statCards.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{label}</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"><Icon className="h-4 w-4" /></span>
-            </div>
-            <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-          </div>
+        {statCards.map(({ label, value, icon: Icon, tone }) => (
+          <StatsCard
+            key={label}
+            label={label}
+            value={value}
+            icon={Icon}
+            iconClassName={tone === 'info' ? 'text-sky-600' : 'text-emerald-600'}
+            iconBgClassName={tone === 'info' ? 'bg-sky-50 dark:bg-sky-950/40' : 'bg-emerald-50 dark:bg-emerald-950/40'}
+            loading={loading && agents.length === 0}
+          />
         ))}
       </div>
 

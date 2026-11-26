@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Textarea } from '@/components/ui/textarea'
 import { maxLength, required, validate } from '@/lib/validate'
 import api from '@/lib/api'
@@ -1048,36 +1049,37 @@ export function SupportPage() {
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-brand-600">Customer support</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Support tickets</h1>
-          {/* Stats */}
-          <div className="flex gap-3 overflow-x-auto pb-1 mt-3">
-            {[
-              { label: 'Total tickets', value: stats.total, icon: MessageSquareText, color: 'text-brand-600' },
-              { label: 'Open', value: stats.open, icon: AlertCircle, color: 'text-amber-600' },
-              { label: 'In progress', value: stats.inProgress, icon: Clock, color: 'text-blue-600' },
-              { label: 'Resolved', value: stats.resolved, icon: CheckCircle2, color: 'text-emerald-600' },
-            ].map(({ label, value, icon: Icon, color }) => (
-              <div key={label} className="flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <span className={`flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800 ${color}`}>
-                  <Icon className="h-3 w-3" />
-                </span>
-                <p className="text-xs text-slate-500">{label}</p>
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-              </div>
-            ))}
+      <PageHeader
+        eyebrow="Customer support"
+        title="Support tickets"
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchTickets} disabled={loading}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
+            </Button>
+            <Button variant="outline" onClick={() => { setShowSettings(true); setSettingsTab(isSuperAdmin ? 'chat' : 'defaults') }}>
+              <Settings className="mr-2 h-4 w-4" />Chat Settings
+            </Button>
+          </>
+        }
+      />
+
+      {/* Stats */}
+      <div className="flex gap-3 overflow-x-auto pb-1 -mt-2">
+        {[
+          { label: 'Total tickets', value: stats.total, icon: MessageSquareText, color: 'text-brand-600' },
+          { label: 'Open', value: stats.open, icon: AlertCircle, color: 'text-amber-600' },
+          { label: 'In progress', value: stats.inProgress, icon: Clock, color: 'text-blue-600' },
+          { label: 'Resolved', value: stats.resolved, icon: CheckCircle2, color: 'text-emerald-600' },
+        ].map(({ label, value, icon: Icon, color }) => (
+          <div key={label} className="flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <span className={`flex h-6 w-6 items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800 ${color}`}>
+              <Icon className="h-3 w-3" />
+            </span>
+            <p className="text-xs text-slate-500">{label}</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{value}</p>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchTickets} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
-          </Button>
-          <Button variant="outline" onClick={() => { setShowSettings(true); setSettingsTab(isSuperAdmin ? 'chat' : 'defaults') }}>
-            <Settings className="mr-2 h-4 w-4" />Chat Settings
-          </Button>
-        </div>
+        ))}
       </div>
 
       {/* Page tabs (super admin only) */}

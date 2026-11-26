@@ -3,6 +3,8 @@ import { CalendarDays, Check, Clock, Plus, Search, Tag, Trash2, Pencil, Sparkles
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { FilterBar } from '@/components/ui/FilterBar'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { DealImageField } from '@/features/flash-deals/FlashDealsPage'
 import { dateAfter, dateInFuture, inRange, isInteger, isUrl, maxLength, required, validate } from '@/lib/validate'
@@ -309,42 +311,29 @@ export function SeasonalPromotionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Marketing Campaigns</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Seasonal Promotions
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            These appear in the customer app under Seasonal Promotions, filterable by category tab.
-          </p>
-        </div>
-        <Button onClick={openCreateDialog}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Promotion
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Marketing Campaigns"
+        title="Seasonal Promotions"
+        description="These appear in the customer app under Seasonal Promotions, filterable by category tab."
+        actions={
+          <Button onClick={openCreateDialog}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Promotion
+          </Button>
+        }
+      />
 
       {/* Promotions list */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex gap-2">
-            {(['All', 'Active', 'Ended'] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`rounded-xl px-3 py-1.5 text-sm font-medium transition ${
-                  filter === f
-                    ? 'bg-brand-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-        </div>
+        <FilterBar
+          filters={[
+            { value: 'All', label: 'All' },
+            { value: 'Active', label: 'Active' },
+            { value: 'Ended', label: 'Ended' },
+          ]}
+          activeFilter={filter}
+          onFilterChange={(v) => setFilter(v as typeof filter)}
+        />
 
         {loading ? (
           <div className="p-12 text-center text-slate-500">Loading promotions...</div>

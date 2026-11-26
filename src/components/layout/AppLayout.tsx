@@ -31,20 +31,29 @@ export function AppLayout() {
     <div className="flex h-screen overflow-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((prev) => !prev)} />
 
+      {!sidebarCollapsed && (
+        <div
+          className="fixed inset-0 z-20 bg-black/40 md:hidden"
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
+
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar onSidebarToggle={() => setSidebarCollapsed((prev) => !prev)} />
         <Breadcrumbs />
 
-        <main className="flex-1 overflow-auto px-4 pb-24 pt-4 md:px-6 md:pb-28 md:pt-6">
+        <main className="flex-1 overflow-auto px-4 pb-24 pt-4 md:px-6 md:pb-28 md:pt-6 max-w-screen-2xl mx-auto w-full">
           {/*
             ErrorBoundary catches any render/lifecycle crash inside a page.
             Suspense handles lazy-loaded page chunks (future code-splitting).
           */}
-          <ErrorBoundary>
-            <Suspense fallback={<PageLoader />}>
-              <Outlet />
-            </Suspense>
-          </ErrorBoundary>
+          <div key={pathname} className="animate-fadeIn">
+            <ErrorBoundary>
+              <Suspense fallback={<PageLoader />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
+          </div>
         </main>
       </div>
 
@@ -53,10 +62,11 @@ export function AppLayout() {
         <Link
           to="/support"
           aria-label="Open support chat"
-          title="Support chat"
+          title="Seller support chat"
           className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-white shadow-lg shadow-brand-600/30 transition hover:bg-brand-700 hover:shadow-xl"
         >
-          <MessageCircle className="h-6 w-6" />
+          <span className="absolute h-14 w-14 animate-ping rounded-full bg-brand-600/40" />
+          <MessageCircle className="relative h-6 w-6" />
         </Link>
       )}
 

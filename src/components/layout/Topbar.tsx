@@ -1,5 +1,5 @@
 import { Bell, CheckCheck, ChevronDown, Globe2, Moon, PanelLeft, Search, Sun } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
@@ -34,8 +34,10 @@ export function Topbar({ onSidebarToggle }: TopbarProps) {
   const [darkMode, setDarkMode] = useState(false)
   const [notifications, setNotifications] = useState<TopbarNotification[]>([])
   const [notifOpen, setNotifOpen] = useState(false)
+  const [badgePulse, setBadgePulse] = useState(false)
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
+  const searchRef = useRef<HTMLInputElement>(null)
 
   const unreadCount = notifications.filter((n) => !n.is_read).length
 
@@ -54,6 +56,25 @@ export function Topbar({ onSidebarToggle }: TopbarProps) {
     return () => clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    if (unreadCount > 0) {
+      setBadgePulse(true)
+      const t = setTimeout(() => setBadgePulse(false), 3000)
+      return () => clearTimeout(t)
+    }
+  }, [unreadCount])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   const role = user?.role as Role | undefined
   const roleColor = role ? ROLE_COLORS[role] : 'bg-slate-100 text-slate-600'
   const roleLabel = role ? ROLE_LABELS[role] : 'User'
@@ -64,124 +85,132 @@ export function Topbar({ onSidebarToggle }: TopbarProps) {
   }, [darkMode])
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/90 md:px-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="md:hidden" aria-label="Toggle sidebar" onClick={onSidebarToggle}>
-          <PanelLeft className="h-4 w-4" />
-        </Button>
+    <header className="relative sticky top-0 z-30 flex h-16 items-center border-b border-slate-200 bg-white/90 px-4 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/90 md:px-6">
+      <div className="max-w-screen-2xl mx-auto w-full flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="md:hidden" aria-label="Toggle sidebar" onClick={onSidebarToggle}>
+            <PanelLeft className="h-4 w-4" />
+          </Button>
 
-        <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 md:flex">
-          <Search className="h-4 w-4" />
-          <span>Search</span>
-          <span className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold uppercase dark:border-slate-700 dark:bg-slate-950">Ctrl K</span>
+          <label className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 md:flex">
+            <Search className="h-4 w-4" />
+            <input
+              ref={searchRef}
+              type="text"
+              placeholder="Search..."
+              className="bg-transparent outline-none text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 w-32 focus:w-48 transition-all duration-200"
+            />
+            <span className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold uppercase dark:border-slate-700 dark:bg-slate-950">Ctrl K</span>
+          </label>
+        </div>
+
+        <div className="flex items-center gap-2 md:gap-3">
+          <Button variant="outline" size="sm" className="gap-2">
+            <Globe2 className="h-4 w-4" />
+            <span className="hidden sm:inline">EN</span>
+          </Button>
+
+          <Button variant="outline" size="icon" aria-label="Toggle theme" onClick={() => setDarkMode((p) => !p)}>
+            {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+
+          <DropdownMenu onOpenChange={(open) => { setNotifOpen(open); if (open) fetchNotifications() }}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+                <Bell className="h-4 w-4" />
+                {unreadCount > 0 && (
+                  <Badge variant="warning" className={`absolute -right-1 -top-1 min-h-5 min-w-5 justify-center rounded-full px-1.5 py-0.5 text-[10px]${badgePulse ? ' animate-pulse' : ''}`}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+              <div className="flex items-center justify-between px-3 py-2">
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Notifications</p>
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
+                    onClick={async () => {
+                      try { await api.patch('/notifications/read-all') } catch { /* ignore */ }
+                      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
+                    }}
+                  >
+                    <CheckCheck className="h-3.5 w-3.5" /> Mark all read
+                  </button>
+                )}
+              </div>
+              <div className="my-1 h-px bg-slate-200 dark:bg-slate-800" />
+              {notifications.length === 0 ? (
+                <p className="px-3 py-6 text-center text-sm text-slate-400">No notifications</p>
+              ) : (
+                notifications.map((n) => (
+                  <DropdownMenuItem
+                    key={n.id}
+                    className="flex cursor-pointer flex-col items-start gap-0.5 px-3 py-2.5"
+                    onClick={async () => {
+                      if (!n.is_read) {
+                        try { await api.patch(`/notifications/${n.id}/read`) } catch { /* ignore */ }
+                        setNotifications((prev) => prev.map((x) => x.id === n.id ? { ...x, is_read: true } : x))
+                      }
+                    }}
+                  >
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <p className={`truncate text-sm ${n.is_read ? 'font-normal text-slate-600 dark:text-slate-300' : 'font-semibold text-slate-900 dark:text-slate-100'}`}>
+                        {n.title}
+                      </p>
+                      <span className="flex-shrink-0 text-[10px] text-slate-400">{timeAgo(n.created_at)}</span>
+                    </div>
+                    <p className="line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{n.body}</p>
+                  </DropdownMenuItem>
+                ))
+              )}
+              {notifOpen && (
+                <>
+                  <div className="my-1 h-px bg-slate-200 dark:bg-slate-800" />
+                  <div className="px-3 py-2">
+                    <Link to="/notifications" className="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">
+                      Manage notifications
+                    </Link>
+                  </div>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2 px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl">
+                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${roleColor}`}>
+                  {initial}
+                </div>
+                <div className="hidden text-left md:block">
+                  <p className="text-sm font-medium leading-tight">{user?.name ?? 'Admin'}</p>
+                  <p className={`text-[11px] font-semibold leading-tight ${roleColor.split(' ').find(c => c.startsWith('text-')) ?? 'text-slate-500'}`}>
+                    {roleLabel}
+                  </p>
+                </div>
+                <ChevronDown className="h-4 w-4 text-slate-500" />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-48">
+              <Link to="/profile"><DropdownMenuItem>My profile</DropdownMenuItem></Link>
+              {role === 'SUPER_ADMIN' && (
+                <Link to="/settings"><DropdownMenuItem>Settings</DropdownMenuItem></Link>
+              )}
+              <DropdownMenuItem
+                className="text-red-600 dark:text-red-400"
+                onClick={() => { logout(); navigate('/login') }}
+              >
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
-
-      <div className="flex items-center gap-2 md:gap-3">
-        <Button variant="outline" size="sm" className="gap-2">
-          <Globe2 className="h-4 w-4" />
-          <span className="hidden sm:inline">EN</span>
-        </Button>
-
-        <Button variant="outline" size="icon" aria-label="Toggle theme" onClick={() => setDarkMode((p) => !p)}>
-          {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
-
-        <DropdownMenu onOpenChange={(open) => { setNotifOpen(open); if (open) fetchNotifications() }}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 && (
-                <Badge variant="warning" className="absolute -right-1 -top-1 min-h-5 min-w-5 justify-center rounded-full px-1.5 py-0.5 text-[10px]">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </Badge>
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <div className="flex items-center justify-between px-3 py-2">
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Notifications</p>
-              {unreadCount > 0 && (
-                <button
-                  type="button"
-                  className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
-                  onClick={async () => {
-                    try { await api.patch('/notifications/read-all') } catch { /* ignore */ }
-                    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
-                  }}
-                >
-                  <CheckCheck className="h-3.5 w-3.5" /> Mark all read
-                </button>
-              )}
-            </div>
-            <div className="my-1 h-px bg-slate-200 dark:bg-slate-800" />
-            {notifications.length === 0 ? (
-              <p className="px-3 py-6 text-center text-sm text-slate-400">No notifications</p>
-            ) : (
-              notifications.map((n) => (
-                <DropdownMenuItem
-                  key={n.id}
-                  className="flex cursor-pointer flex-col items-start gap-0.5 px-3 py-2.5"
-                  onClick={async () => {
-                    if (!n.is_read) {
-                      try { await api.patch(`/notifications/${n.id}/read`) } catch { /* ignore */ }
-                      setNotifications((prev) => prev.map((x) => x.id === n.id ? { ...x, is_read: true } : x))
-                    }
-                  }}
-                >
-                  <div className="flex w-full items-center justify-between gap-2">
-                    <p className={`truncate text-sm ${n.is_read ? 'font-normal text-slate-600 dark:text-slate-300' : 'font-semibold text-slate-900 dark:text-slate-100'}`}>
-                      {n.title}
-                    </p>
-                    <span className="flex-shrink-0 text-[10px] text-slate-400">{timeAgo(n.created_at)}</span>
-                  </div>
-                  <p className="line-clamp-2 text-xs text-slate-500 dark:text-slate-400">{n.body}</p>
-                </DropdownMenuItem>
-              ))
-            )}
-            {notifOpen && (
-              <>
-                <div className="my-1 h-px bg-slate-200 dark:bg-slate-800" />
-                <div className="px-3 py-2">
-                  <Link to="/notifications" className="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">
-                    Manage notifications
-                  </Link>
-                </div>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2 px-2 py-2">
-              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${roleColor}`}>
-                {initial}
-              </div>
-              <div className="hidden text-left md:block">
-                <p className="text-sm font-medium leading-tight">{user?.name ?? 'Admin'}</p>
-                <p className={`text-[11px] font-semibold leading-tight ${roleColor.split(' ').find(c => c.startsWith('text-')) ?? 'text-slate-500'}`}>
-                  {roleLabel}
-                </p>
-              </div>
-              <ChevronDown className="h-4 w-4 text-slate-500" />
-            </Button>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent align="end" className="w-48">
-            <Link to="/profile"><DropdownMenuItem>My profile</DropdownMenuItem></Link>
-            {role === 'SUPER_ADMIN' && (
-              <Link to="/settings"><DropdownMenuItem>Settings</DropdownMenuItem></Link>
-            )}
-            <DropdownMenuItem
-              className="text-red-600 dark:text-red-400"
-              onClick={() => { logout(); navigate('/login') }}
-            >
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-brand-500 via-brand-600 to-transparent" />
     </header>
   )
 }

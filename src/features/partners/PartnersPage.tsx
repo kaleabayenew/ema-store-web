@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  Building2, CheckCircle2, Clock, Star, Search, MoreHorizontal, Loader2, AlertCircle,
+  Building2, CheckCircle2, Clock, Star, MoreHorizontal, Loader2, AlertCircle,
   ChevronLeft, ChevronRight, Eye, Clipboard, Phone, Ban, ShieldCheck, KeyRound, Copy,
 } from 'lucide-react'
 
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAlert } from '@/components/ui/ConfirmDialog'
+import { PageHeader, StatsCard, FilterBar } from '@/components/ui'
 import api from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 
@@ -48,10 +49,29 @@ interface PartnerProduct {
   createdAt: string
 }
 
+interface PartnerWallet {
+  availableBalanceCents: number
+  settledPayoutCents: number
+  pendingPayoutCents: number
+  totalRevenueCents: number
+}
+
+interface PartnerTransaction {
+  id: string
+  title: string | null
+  description: string | null
+  amount: number
+  type: string | null
+  status: string | null
+  createdAt: string
+}
+
 interface PartnerDetail extends Partner {
   phone?: string
   email?: string
   productList?: PartnerProduct[]
+  wallet?: PartnerWallet | null
+  transactions?: PartnerTransaction[]
 }
 
 type FilterStatus = 'All' | 'APPROVED' | 'PENDING' | 'SUSPENDED'
@@ -184,67 +204,72 @@ export function PartnersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Partner management</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Partners</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchPartners} disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Refresh
-          </Button>
-          <Button>Add partner</Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Partner management"
+        title="Partners"
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchPartners} disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Refresh
+            </Button>
+            <Button>Add partner</Button>
+          </>
+        }
+      />
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: 'Total partners', value: stats.total,    icon: Building2,    color: 'text-brand-600' },
-          { label: 'Approved',       value: stats.approved,  icon: CheckCircle2, color: 'text-emerald-600' },
-          { label: 'Pending review', value: stats.pending,   icon: Clock,        color: 'text-amber-600' },
-          { label: 'Avg. rating',    value: stats.avgRating,  icon: Star,         color: 'text-violet-600' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{label}</span>
-              <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 ${color}`}>
-                <Icon className="h-4 w-4" />
-              </span>
-            </div>
-            <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-          </div>
-        ))}
+        <StatsCard
+          label="Total partners"
+          value={stats.total}
+          icon={Building2}
+          iconClassName="text-brand-600"
+          iconBgClassName="bg-brand-50 dark:bg-brand-950/40"
+          loading={loading && partners.length === 0}
+        />
+        <StatsCard
+          label="Approved"
+          value={stats.approved}
+          icon={CheckCircle2}
+          iconClassName="text-emerald-600"
+          iconBgClassName="bg-emerald-50 dark:bg-emerald-950/40"
+          loading={loading && partners.length === 0}
+        />
+        <StatsCard
+          label="Pending review"
+          value={stats.pending}
+          icon={Clock}
+          iconClassName="text-amber-600"
+          iconBgClassName="bg-amber-50 dark:bg-amber-950/40"
+          loading={loading && partners.length === 0}
+        />
+        <StatsCard
+          label="Avg. rating"
+          value={stats.avgRating}
+          icon={Star}
+          iconClassName="text-violet-600"
+          iconBgClassName="bg-violet-50 dark:bg-violet-950/40"
+          loading={loading && partners.length === 0}
+        />
       </div>
 
       {/* Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         {/* Toolbar */}
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search shop, owner or phone…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-80"
-            />
-          </div>
-          <div className="flex gap-2">
-            {(['All', 'APPROVED', 'PENDING', 'SUSPENDED'] as FilterStatus[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-medium capitalize transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}
-              >
-                {f === 'All' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase()}
-              </button>
-            ))}
-          </div>
-        </div>
+        <FilterBar
+          filters={[
+            { value: 'All', label: 'All' },
+            { value: 'APPROVED', label: 'Approved' },
+            { value: 'PENDING', label: 'Pending' },
+            { value: 'SUSPENDED', label: 'Suspended' },
+          ]}
+          activeFilter={filter}
+          onFilterChange={(v) => setFilter(v as FilterStatus)}
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search shop, owner or phone…"
+        />
 
         {error && (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">
@@ -455,6 +480,55 @@ export function PartnersPage() {
                 </div>
               )}
             </div>
+
+            {/* Wallet */}
+            {selected.wallet && (
+              <div className="border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Wallet
+                </p>
+                <div className="mb-3 grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Available', value: `ETB ${(selected.wallet.availableBalanceCents / 100).toLocaleString('en-ET', { minimumFractionDigits: 2 })}` },
+                    { label: 'Paid out', value: `ETB ${(selected.wallet.settledPayoutCents / 100).toLocaleString('en-ET', { minimumFractionDigits: 2 })}` },
+                    { label: 'Pending', value: `ETB ${(selected.wallet.pendingPayoutCents / 100).toLocaleString('en-ET', { minimumFractionDigits: 2 })}` },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="rounded-xl bg-emerald-50 p-2.5 text-center dark:bg-emerald-950/40">
+                      <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{value}</p>
+                      <p className="text-[11px] text-slate-400">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                {(selected.transactions ?? []).length > 0 && (
+                  <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
+                    {(selected.transactions ?? []).map((tx) => {
+                      const isCredit = tx.type === 'ORDER_PAYOUT' || tx.type === 'REFUND'
+                      return (
+                        <div key={tx.id} className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800">
+                          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isCredit ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                            {isCredit ? '↓' : '↑'}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{tx.title ?? tx.type ?? 'Transaction'}</p>
+                            <p className="text-xs text-slate-400">
+                              {tx.description ? `${tx.description} · ` : ''}
+                              {new Date(tx.createdAt).toLocaleDateString('en-ET', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {tx.status ? ` · ${tx.status}` : ''}
+                            </p>
+                          </div>
+                          <p className={`shrink-0 text-sm font-bold ${isCredit ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {isCredit ? '+' : '−'}ETB {Math.abs(tx.amount).toLocaleString('en-ET', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {(selected.transactions ?? []).length === 0 && (
+                  <p className="text-xs text-slate-400">No wallet transactions yet.</p>
+                )}
+              </div>
+            )}
 
             {/* Products list */}
             {selected.productList && selected.productList.length > 0 && (

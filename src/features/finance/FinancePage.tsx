@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { TrendingUp, CreditCard, ArrowUpRight, ArrowDownLeft, MoreHorizontal } from 'lucide-react'
 
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Badge, Button, PageHeader, StatsCard } from '@/components/ui/index'
 
 const stats = [
   { label: 'Gross revenue',   value: 'ETB 4.8M', delta: '+18.2%', tone: 'success', icon: TrendingUp },
@@ -43,25 +42,37 @@ export function FinancePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Finance</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Finance & Payouts</h1>
-        </div>
-        <Button variant="outline">Export statement</Button>
-      </div>
+      <PageHeader
+        eyebrow="Finance"
+        title="Finance & Payouts"
+        actions={<Button variant="outline">Export statement</Button>}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map(({ label, value, delta, tone, icon: Icon }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{label}</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"><Icon className="h-4 w-4" /></span>
-            </div>
-            <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-            <Badge variant={tone as 'success' | 'info' | 'danger'} className="mt-2">{delta}</Badge>
-          </div>
-        ))}
+        {stats.map(({ label, value, delta, tone, icon }) => {
+          const iconBgClassName =
+            tone === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/40'
+            : tone === 'info'    ? 'bg-sky-50 dark:bg-sky-950/40'
+            : tone === 'danger'  ? 'bg-red-50 dark:bg-red-950/40'
+            : 'bg-brand-50 dark:bg-brand-950/40'
+          const iconClassName =
+            tone === 'success' ? 'text-emerald-600 dark:text-emerald-300'
+            : tone === 'info'    ? 'text-sky-600 dark:text-sky-300'
+            : tone === 'danger'  ? 'text-red-500 dark:text-red-300'
+            : 'text-brand-600 dark:text-brand-300'
+          return (
+            <StatsCard
+              key={label}
+              label={label}
+              value={value}
+              icon={icon}
+              iconBgClassName={iconBgClassName}
+              iconClassName={iconClassName}
+              delta={delta}
+              deltaPositive={delta.startsWith('+')}
+            />
+          )
+        })}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">

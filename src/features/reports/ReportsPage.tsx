@@ -3,6 +3,9 @@ import { Download, TrendingUp } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DataTable } from '@/components/ui/DataTable'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { StatsCard } from '@/components/ui/StatsCard'
 
 const kpis = [
   { label: 'Revenue (Jul)',   value: 'ETB 842K', delta: '+18.2%', tone: 'success' },
@@ -44,28 +47,28 @@ const topProducts = [
 export function ReportsPage() {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Analytics & Reports</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Reports</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2"><Download className="h-4 w-4" />Export PDF</Button>
-          <Button variant="outline">Last 30 days</Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Analytics & Reports"
+        title="Reports"
+        actions={
+          <>
+            <Button variant="outline" className="gap-2"><Download className="h-4 w-4" />Export PDF</Button>
+            <Button variant="outline">Last 30 days</Button>
+          </>
+        }
+      />
 
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.map(({ label, value, delta, tone }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{label}</span>
-              <TrendingUp className="h-4 w-4 text-slate-300" />
-            </div>
-            <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-            <Badge variant={tone as 'success' | 'info' | 'warning'} className="mt-2">{delta}</Badge>
-          </div>
+        {kpis.map(({ label, value, delta }) => (
+          <StatsCard
+            key={label}
+            label={label}
+            value={value}
+            icon={TrendingUp}
+            delta={delta}
+            deltaPositive={delta.startsWith('+')}
+          />
         ))}
       </div>
 
@@ -155,33 +158,33 @@ export function ReportsPage() {
       </div>
 
       {/* Top products */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="border-b border-slate-200 p-4 dark:border-slate-800">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Top 5 products this month</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left dark:border-slate-800">
-                {['#', 'Product', 'Category', 'Units sold', 'Revenue'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {topProducts.map((p) => (
-                <tr key={p.rank} className="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                  <td className="px-4 py-3 font-bold text-brand-600 dark:text-brand-400">{p.rank}</td>
-                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{p.name}</td>
-                  <td className="px-4 py-3"><Badge variant="default">{p.category}</Badge></td>
-                  <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{p.sold}</td>
-                  <td className="px-4 py-3 font-bold text-emerald-600 dark:text-emerald-400">{p.revenue}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={[
+          {
+            key: 'rank', header: '#',
+            cell: (p) => <span className="font-bold text-brand-600 dark:text-brand-400">{p.rank}</span>,
+          },
+          {
+            key: 'name', header: 'Product', sortable: true,
+            cell: (p) => <span className="font-medium text-slate-900 dark:text-slate-100">{p.name}</span>,
+          },
+          {
+            key: 'category', header: 'Category', sortable: true,
+            cell: (p) => <Badge variant="default">{p.category}</Badge>,
+          },
+          {
+            key: 'sold', header: 'Units sold', sortable: true,
+            cell: (p) => <span className="font-semibold text-slate-900 dark:text-slate-100">{p.sold}</span>,
+          },
+          {
+            key: 'revenue', header: 'Revenue', sortable: true,
+            cell: (p) => <span className="font-bold text-emerald-600 dark:text-emerald-400">{p.revenue}</span>,
+          },
+        ]}
+        data={topProducts}
+        keyExtractor={(p) => String(p.rank)}
+        emptyTitle="No product data"
+      />
     </div>
   )
 }

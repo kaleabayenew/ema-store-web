@@ -3,6 +3,7 @@ import { Loader2, Megaphone, Pencil, Plus, Send, Trash2 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -214,26 +215,22 @@ export function AnnouncementsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Broadcast center</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Announcements
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Send in-app notifications, push alerts and Telegram messages to customers, partners and ride users.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => void fetchAll()} disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Refresh
-          </Button>
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" /> New announcement
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Broadcast center"
+        title="Announcements"
+        description="Send in-app notifications, push alerts and Telegram messages to customers, partners and ride users."
+        actions={
+          <>
+            <Button variant="outline" onClick={() => void fetchAll()} disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Refresh
+            </Button>
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" /> New announcement
+            </Button>
+          </>
+        }
+      />
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">

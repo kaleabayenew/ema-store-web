@@ -3,6 +3,9 @@ import { Boxes, Package, Star, Search, Pencil, Trash2, Loader2, AlertCircle, Che
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { FilterBar } from '@/components/ui/FilterBar'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { StatsCard } from '@/components/ui/StatsCard'
 import { useAlert } from '@/components/ui/ConfirmDialog'
 import { ProductForm } from './ProductForm'
 import api from '@/lib/api'
@@ -306,67 +309,44 @@ export function ProductsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Product management</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Products</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchProducts} disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Refresh
-          </Button>
-          {isSuperAdmin && <Button onClick={() => setShowAddDialog(true)}>Add product</Button>}
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Product management"
+        title="Products"
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchProducts} disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Refresh
+            </Button>
+            {isSuperAdmin && <Button onClick={() => setShowAddDialog(true)}>Add product</Button>}
+          </>
+        }
+      />
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: 'Total products', value: stats.total,    icon: Boxes,   color: 'text-brand-600' },
-          { label: 'Approved',       value: stats.approved,  icon: Package,  color: 'text-emerald-600' },
-          { label: 'Pending review', value: stats.pending,   icon: Package,  color: 'text-amber-600' },
-          { label: 'Avg. rating',     value: stats.avgRating, icon: Star,     color: 'text-violet-600' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{label}</span>
-              <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 ${color}`}>
-                <Icon className="h-4 w-4" />
-              </span>
-            </div>
-            <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-          </div>
-        ))}
+        <StatsCard label="Total products" value={stats.total} icon={Boxes} iconClassName="text-brand-600" loading={loading} />
+        <StatsCard label="Approved" value={stats.approved} icon={Package} iconClassName="text-emerald-600" iconBgClassName="bg-emerald-50 dark:bg-emerald-950/40" loading={loading} />
+        <StatsCard label="Pending review" value={stats.pending} icon={Package} iconClassName="text-amber-600" iconBgClassName="bg-amber-50 dark:bg-amber-950/40" loading={loading} />
+        <StatsCard label="Avg. rating" value={stats.avgRating} icon={Star} iconClassName="text-violet-600" iconBgClassName="bg-violet-50 dark:bg-violet-950/40" loading={loading} />
       </div>
 
       {/* Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         {/* Toolbar */}
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by name, category or SKU…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-80"
-            />
-          </div>
-          <div className="flex gap-2">
-            {(['All', 'APPROVED', 'PENDING', 'REJECTED'] as FilterStatus[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-medium capitalize transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}
-              >
-                {f === 'All' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase()}
-              </button>
-            ))}
-          </div>
-        </div>
+        <FilterBar
+          filters={[
+            { value: 'All', label: 'All' },
+            { value: 'APPROVED', label: 'Approved' },
+            { value: 'PENDING', label: 'Pending' },
+            { value: 'REJECTED', label: 'Rejected' },
+          ]}
+          activeFilter={filter}
+          onFilterChange={(v) => setFilter(v as FilterStatus)}
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search by name, category or SKU…"
+        />
 
         {/* Error banner (keep table visible if we have cached data) */}
         {error && (

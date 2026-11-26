@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  ShoppingCart, CheckCircle2, Package, XCircle, Search,
+  ShoppingCart, CheckCircle2, Package, XCircle,
   Loader2, AlertCircle, Eye, ChevronLeft, ChevronRight,
   MoreHorizontal, TrendingUp,
 } from 'lucide-react'
@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAlert, useConfirm } from '@/components/ui/ConfirmDialog'
+import { PageHeader, StatsCard, FilterBar } from '@/components/ui'
 import api from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 
@@ -273,65 +274,76 @@ export function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Order management</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Orders</h1>
-        </div>
-        <Button variant="outline" onClick={() => fetchOrders()} disabled={loading}>
-          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Refresh
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Order management"
+        title="Orders"
+        actions={
+          <Button variant="outline" onClick={() => fetchOrders()} disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Refresh
+          </Button>
+        }
+      />
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {[
-          { label: 'Total orders', value: stats.total.toLocaleString(), icon: ShoppingCart, color: 'text-brand-600' },
-          { label: 'Delivered', value: stats.delivered.toLocaleString(), icon: CheckCircle2, color: 'text-emerald-600' },
-          { label: 'In transit', value: stats.inTransit.toLocaleString(), icon: Package, color: 'text-blue-600' },
-          { label: 'Cancelled', value: stats.cancelled.toLocaleString(), icon: XCircle, color: 'text-red-500' },
-          { label: 'Total revenue', value: formatCurrency(stats.totalRevenue), icon: TrendingUp, color: 'text-violet-600' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{label}</span>
-              <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 ${color}`}>
-                <Icon className="h-4 w-4" />
-              </span>
-            </div>
-            <p className="mt-4 text-xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-          </div>
-        ))}
+        <StatsCard
+          label="Total orders"
+          value={stats.total.toLocaleString()}
+          icon={ShoppingCart}
+          iconClassName="text-brand-600"
+          iconBgClassName="bg-brand-50 dark:bg-brand-950/40"
+          loading={loading && orders.length === 0}
+        />
+        <StatsCard
+          label="Delivered"
+          value={stats.delivered.toLocaleString()}
+          icon={CheckCircle2}
+          iconClassName="text-emerald-600"
+          iconBgClassName="bg-emerald-50 dark:bg-emerald-950/40"
+          loading={loading && orders.length === 0}
+        />
+        <StatsCard
+          label="In transit"
+          value={stats.inTransit.toLocaleString()}
+          icon={Package}
+          iconClassName="text-blue-600"
+          iconBgClassName="bg-blue-50 dark:bg-blue-950/40"
+          loading={loading && orders.length === 0}
+        />
+        <StatsCard
+          label="Cancelled"
+          value={stats.cancelled.toLocaleString()}
+          icon={XCircle}
+          iconClassName="text-red-500"
+          iconBgClassName="bg-red-50 dark:bg-red-950/40"
+          loading={loading && orders.length === 0}
+        />
+        <StatsCard
+          label="Total revenue"
+          value={formatCurrency(stats.totalRevenue)}
+          icon={TrendingUp}
+          iconClassName="text-violet-600"
+          iconBgClassName="bg-violet-50 dark:bg-violet-950/40"
+          loading={loading && orders.length === 0}
+        />
       </div>
 
       {/* Table */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        {/* Toolbar */}
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by order ID or customer…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-80"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {(['All', 'PENDING', 'SHIPPED', 'DELIVERED', 'CANCELLED'] as FilterStatus[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-medium transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}
-              >
-                {STATUS_LABEL[f] ?? f}
-              </button>
-            ))}
-          </div>
-        </div>
+        <FilterBar
+          filters={[
+            { value: 'All', label: 'All' },
+            { value: 'PENDING', label: 'Pending' },
+            { value: 'SHIPPED', label: 'Shipped' },
+            { value: 'DELIVERED', label: 'Delivered' },
+            { value: 'CANCELLED', label: 'Cancelled' },
+          ]}
+          activeFilter={filter}
+          onFilterChange={(v) => setFilter(v as FilterStatus)}
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search by order ID or customer…"
+        />
 
         {error && (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">

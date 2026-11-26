@@ -3,6 +3,9 @@ import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { FilterBar } from '@/components/ui/FilterBar'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { StatsCard } from '@/components/ui/StatsCard'
 
 const stats = [
   { label: 'Active zones',      value: '8',    delta: '+1',     tone: 'info',    icon: MapPin },
@@ -44,40 +47,40 @@ export function DeliveryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Delivery management</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Delivery & Zones</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline">Export</Button>
-          <Button>Add zone</Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Delivery management"
+        title="Delivery & Zones"
+        actions={
+          <>
+            <Button variant="outline">Export</Button>
+            <Button>Add zone</Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map(({ label, value, delta, tone, icon: Icon }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{label}</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-300"><Icon className="h-4 w-4" /></span>
-            </div>
-            <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-            <Badge variant={tone as 'success' | 'info'} className="mt-2">{delta}</Badge>
-          </div>
+          <StatsCard
+            key={label}
+            label={label}
+            value={value}
+            icon={Icon}
+            delta={delta}
+            deltaPositive={delta.startsWith('+')}
+          />
         ))}
       </div>
 
       {/* Zones */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-slate-800">
-          <h2 className="font-semibold text-slate-900 dark:text-slate-100">Delivery zones</h2>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input type="text" placeholder="Search zones…" value={search} onChange={(e) => setSearch(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 w-56" />
-          </div>
-        </div>
+        <FilterBar
+          filters={[{ value: 'all', label: 'All zones' }]}
+          activeFilter="all"
+          onFilterChange={() => {}}
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search zones…"
+        />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

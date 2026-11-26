@@ -3,6 +3,8 @@ import { Loader2, RefreshCw, Star, Trash2 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { StatsCard } from '@/components/ui/StatsCard'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/lib/api'
@@ -88,27 +90,20 @@ export function ReviewsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Community</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Reviews</h1>
-        </div>
-        <Button variant="outline" onClick={fetchReviews} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Community"
+        title="Reviews"
+        actions={
+          <Button variant="outline" onClick={fetchReviews} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
+          </Button>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        {[
-          { label: 'Total reviews', value: reviews.length.toLocaleString() },
-          { label: 'Average rating', value: avgRating },
-          { label: 'Hidden', value: reviews.filter((r) => !r.is_approved).length.toLocaleString() },
-        ].map(({ label, value }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <p className="text-sm text-slate-500">{label}</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-          </div>
-        ))}
+        <StatsCard label="Total reviews" value={reviews.length.toLocaleString()} icon={Star} iconClassName="text-amber-500" iconBgClassName="bg-amber-50 dark:bg-amber-950/40" loading={loading && reviews.length === 0} />
+        <StatsCard label="Average rating" value={avgRating} icon={Star} iconClassName="text-violet-600" iconBgClassName="bg-violet-50 dark:bg-violet-950/40" loading={loading && reviews.length === 0} />
+        <StatsCard label="Hidden" value={reviews.filter((r) => !r.is_approved).length.toLocaleString()} icon={Trash2} iconClassName="text-slate-500" loading={loading && reviews.length === 0} />
       </div>
 
       {error && (

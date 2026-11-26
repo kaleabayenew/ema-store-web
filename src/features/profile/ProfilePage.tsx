@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useAuthStore } from '@/store/authStore'
 
 export function ProfilePage() {
@@ -6,12 +7,10 @@ export function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <p className="text-sm font-medium text-brand-600">Account</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-          My profile
-        </h1>
-      </div>
+      <PageHeader
+        eyebrow="Account"
+        title="My profile"
+      />
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">

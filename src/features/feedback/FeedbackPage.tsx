@@ -3,6 +3,9 @@ import { CheckCircle2, Loader2, MessageSquareText, RefreshCw, Star, Trash2 } fro
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { FilterBar } from '@/components/ui/FilterBar'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { StatsCard } from '@/components/ui/StatsCard'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/lib/api'
@@ -87,28 +90,21 @@ export function FeedbackPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Community</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Feedback</h1>
-        </div>
-        <Button variant="outline" onClick={fetchFeedback} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Community"
+        title="Feedback"
+        actions={
+          <Button variant="outline" onClick={fetchFeedback} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
+          </Button>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-4">
-        {[
-          { label: 'Total', value: items.length },
-          { label: 'New', value: items.filter((f) => f.status === 'NEW').length },
-          { label: 'In progress', value: items.filter((f) => f.status === 'IN_PROGRESS').length },
-          { label: 'Resolved', value: items.filter((f) => f.status === 'RESOLVED').length },
-        ].map(({ label, value }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <p className="text-sm text-slate-500">{label}</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-          </div>
-        ))}
+        <StatsCard label="Total" value={items.length} icon={MessageSquareText} loading={loading && items.length === 0} />
+        <StatsCard label="New" value={items.filter((f) => f.status === 'NEW').length} icon={Star} iconClassName="text-amber-600" iconBgClassName="bg-amber-50 dark:bg-amber-950/40" loading={loading && items.length === 0} />
+        <StatsCard label="In progress" value={items.filter((f) => f.status === 'IN_PROGRESS').length} icon={MessageSquareText} iconClassName="text-blue-600" iconBgClassName="bg-blue-50 dark:bg-blue-950/40" loading={loading && items.length === 0} />
+        <StatsCard label="Resolved" value={items.filter((f) => f.status === 'RESOLVED').length} icon={CheckCircle2} iconClassName="text-emerald-600" iconBgClassName="bg-emerald-50 dark:bg-emerald-950/40" loading={loading && items.length === 0} />
       </div>
 
       {error && (
@@ -116,14 +112,16 @@ export function FeedbackPage() {
       )}
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-wrap gap-2 border-b border-slate-200 p-4 dark:border-slate-800">
-          {(['all', 'NEW', 'IN_PROGRESS', 'RESOLVED'] as const).map((f) => (
-            <button key={f} type="button" onClick={() => setFilter(f)}
-              className={`rounded-xl px-3 py-1.5 text-xs font-medium capitalize transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}>
-              {f === 'all' ? 'All' : f === 'IN_PROGRESS' ? 'In progress' : f.charAt(0) + f.slice(1).toLowerCase()}
-            </button>
-          ))}
-        </div>
+        <FilterBar
+          filters={[
+            { value: 'all', label: 'All', count: items.length },
+            { value: 'NEW', label: 'New', count: items.filter((f) => f.status === 'NEW').length },
+            { value: 'IN_PROGRESS', label: 'In progress', count: items.filter((f) => f.status === 'IN_PROGRESS').length },
+            { value: 'RESOLVED', label: 'Resolved', count: items.filter((f) => f.status === 'RESOLVED').length },
+          ]}
+          activeFilter={filter}
+          onFilterChange={(v) => setFilter(v as typeof filter)}
+        />
 
         {loading ? (
           <div className="flex items-center justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-brand-600" /></div>

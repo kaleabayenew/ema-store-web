@@ -6,6 +6,8 @@ import {
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { FilterBar } from '@/components/ui/FilterBar'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAlert, useConfirm, usePrompt } from '@/components/ui/ConfirmDialog'
@@ -203,18 +205,18 @@ export function UsersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Access control</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Manage Users</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchUsers} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
-          </Button>
-          <Button onClick={() => setShowAdd(true)}><Plus className="mr-2 h-4 w-4" />Add user</Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Access control"
+        title="Manage Users"
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchUsers} disabled={loading}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
+            </Button>
+            <Button onClick={() => setShowAdd(true)}><Plus className="mr-2 h-4 w-4" />Add user</Button>
+          </>
+        }
+      />
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">{error}</div>
@@ -223,18 +225,14 @@ export function UsersPage() {
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         {/* User table */}
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="border-b border-slate-200 p-4 dark:border-slate-800">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search users…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-72"
-              />
-            </div>
-          </div>
+          <FilterBar
+            filters={[{ value: 'all', label: 'All users' }]}
+            activeFilter="all"
+            onFilterChange={() => {}}
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search users…"
+          />
 
           {loading && users.length === 0 ? (
             <div className="flex items-center justify-center py-12"><Loader2 className="h-7 w-7 animate-spin text-brand-600" /></div>

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Bell, Loader2, Megaphone, RefreshCw, Send, Users } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { StatsCard } from '@/components/ui/StatsCard'
 import { maxLength, required, validate } from '@/lib/validate'
 import api from '@/lib/api'
 
@@ -100,33 +102,21 @@ export function NotificationsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Notification management</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Notifications</h1>
-        </div>
-        <Button variant="outline" onClick={fetchNotifications} disabled={loadingList}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loadingList ? 'animate-spin' : ''}`} />Refresh
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Notification management"
+        title="Notifications"
+        actions={
+          <Button variant="outline" onClick={fetchNotifications} disabled={loadingList}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loadingList ? 'animate-spin' : ''}`} />Refresh
+          </Button>
+        }
+      />
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {[
-          { label: 'Total sent',   value: total.toLocaleString(), icon: Bell,      color: 'text-brand-600' },
-          { label: 'Recent (30)',  value: sent.toLocaleString(),  icon: Megaphone,  color: 'text-violet-600' },
-          { label: 'Unread',       value: unread.toLocaleString(), icon: Users,    color: 'text-amber-600' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{label}</span>
-              <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 ${color}`}>
-                <Icon className="h-4 w-4" />
-              </span>
-            </div>
-            <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-          </div>
-        ))}
+        <StatsCard label="Total sent" value={total.toLocaleString()} icon={Bell} iconClassName="text-brand-600" loading={loadingList} />
+        <StatsCard label="Recent (30)" value={sent.toLocaleString()} icon={Megaphone} iconClassName="text-violet-600" iconBgClassName="bg-violet-50 dark:bg-violet-950/40" loading={loadingList} />
+        <StatsCard label="Unread" value={unread.toLocaleString()} icon={Users} iconClassName="text-amber-600" iconBgClassName="bg-amber-50 dark:bg-amber-950/40" loading={loadingList} />
       </div>
 
       {/* Send Announcement */}

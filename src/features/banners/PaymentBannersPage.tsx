@@ -3,6 +3,7 @@ import { Trash2, Edit, Loader2, Plus, ImageIcon, ChevronDown } from 'lucide-reac
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
@@ -414,27 +415,25 @@ export function PaymentBannersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Banner management</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            {placement === 'ride' ? 'Ride App Banners' : 'Payment Banners'}
-          </h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchBanners} disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Refresh
-          </Button>
-          <Button onClick={() => {
-            setEditingBanner(null)
-            setFormData(emptyForm())
-            setShowAddDialog(true)
-          }}>
-            Add Banner
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Banner management"
+        title={placement === 'ride' ? 'Ride App Banners' : 'Payment Banners'}
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchBanners} disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Refresh
+            </Button>
+            <Button onClick={() => {
+              setEditingBanner(null)
+              setFormData(emptyForm())
+              setShowAddDialog(true)
+            }}>
+              Add Banner
+            </Button>
+          </>
+        }
+      />
 
       {/* Placement tabs */}
       <div className="flex w-fit gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-800">

@@ -3,6 +3,7 @@ import { RefreshCw, Save, Loader2, Plus, Trash2, GripVertical } from 'lucide-rea
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Label } from '@/components/ui/label'
 import api from '@/lib/api'
 
@@ -228,24 +229,22 @@ export function WheelSettingsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Marketing</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Lucky Spin Wheel Settings
-          </h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchSlices} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button onClick={handleSave} disabled={saving || !isDirty}>
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {isDirty ? 'Save Changes' : 'Saved'}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Marketing"
+        title="Lucky Spin Wheel Settings"
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchSlices} disabled={loading}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            <Button onClick={handleSave} disabled={saving || !isDirty}>
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isDirty ? 'Save Changes' : 'Saved'}
+            </Button>
+          </>
+        }
+      />
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400">

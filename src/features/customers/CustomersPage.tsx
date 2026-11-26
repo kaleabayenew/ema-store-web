@@ -11,7 +11,6 @@ import {
   MoreHorizontal,
   Phone,
   RefreshCw,
-  Search,
   Send,
   ShoppingBag,
   TrendingUp,
@@ -30,6 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { PageHeader, StatsCard, FilterBar } from '@/components/ui'
 import api from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 
@@ -263,66 +263,68 @@ export function CustomersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Customer management</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Customers
-          </h1>
-        </div>
-        <Button variant="outline" size="sm" onClick={fetchCustomers} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Customer management"
+        title="Customers"
+        actions={
+          <Button variant="outline" size="sm" onClick={fetchCustomers} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        }
+      />
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: 'Total customers',  value: total.toLocaleString(),           icon: Users,       color: 'text-brand-600' },
-          { label: 'Active (this page)', value: active.toLocaleString(),         icon: UserCheck,   color: 'text-emerald-600' },
-          { label: 'Blocked (this page)', value: blocked.toLocaleString(),       icon: Ban,         color: 'text-red-500' },
-          { label: 'Total spent (page)', value: formatCurrency(totalSpent),      icon: TrendingUp,  color: 'text-violet-600' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{label}</span>
-              <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 ${color}`}>
-                <Icon className="h-4 w-4" />
-              </span>
-            </div>
-            <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-          </div>
-        ))}
+        <StatsCard
+          label="Total customers"
+          value={total.toLocaleString()}
+          icon={Users}
+          iconClassName="text-brand-600"
+          iconBgClassName="bg-brand-50 dark:bg-brand-950/40"
+          loading={loading}
+        />
+        <StatsCard
+          label="Active (this page)"
+          value={active.toLocaleString()}
+          icon={UserCheck}
+          iconClassName="text-emerald-600"
+          iconBgClassName="bg-emerald-50 dark:bg-emerald-950/40"
+          loading={loading}
+        />
+        <StatsCard
+          label="Blocked (this page)"
+          value={blocked.toLocaleString()}
+          icon={Ban}
+          iconClassName="text-red-500"
+          iconBgClassName="bg-red-50 dark:bg-red-950/40"
+          loading={loading}
+        />
+        <StatsCard
+          label="Total spent (page)"
+          value={formatCurrency(totalSpent)}
+          icon={TrendingUp}
+          iconClassName="text-violet-600"
+          iconBgClassName="bg-violet-50 dark:bg-violet-950/40"
+          loading={loading}
+        />
       </div>
 
       {/* Table card */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         {/* Toolbar */}
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by name or phone…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 sm:w-72"
-            />
-          </div>
-          <div className="flex gap-2">
-            {(['all', 'active', 'blocked'] as FilterStatus[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`rounded-xl px-3 py-1.5 text-sm font-medium capitalize transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-        </div>
+        <FilterBar
+          filters={[
+            { value: 'all', label: 'All' },
+            { value: 'active', label: 'Active' },
+            { value: 'blocked', label: 'Blocked' },
+          ]}
+          activeFilter={filter}
+          onFilterChange={(v) => setFilter(v as FilterStatus)}
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search by name or phone…"
+        />
 
         {/* Error */}
         {error && (

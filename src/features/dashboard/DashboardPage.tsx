@@ -6,12 +6,11 @@ import {
 import {
   BarChart3, Bell, Bike, Boxes, Building2, CreditCard, Flame, Loader2,
   MessageSquareText, PackageCheck, RefreshCw, ShoppingCart,
-  Sparkles, TrendingDown, TrendingUp, UserRoundCog, Users, Warehouse,
+  Sparkles, UserRoundCog, Users, Warehouse,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Badge, Button, PageHeader, StatsCard, DataTable } from '@/components/ui/index'
 import { canAccessRoute, ROLE_LABELS } from '@/config/rbac'
 import api from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
@@ -136,20 +135,16 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">
-            Welcome back, {user?.name ?? 'Admin'} ·{' '}
-            <span className="font-semibold">{ROLE_LABELS[role]}</span>
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Ema Store — Management Dashboard
-          </h1>
-        </div>
-        <Button variant="outline" onClick={fetchDashboard} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow={`Welcome back, ${user?.name ?? 'Admin'} · ${ROLE_LABELS[role]}`}
+        title="Ema Store — Management Dashboard"
+        description="Live overview of sales, orders and operations."
+        actions={
+          <Button variant="outline" onClick={fetchDashboard} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
+          </Button>
+        }
+      />
 
       {error && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">
@@ -183,59 +178,65 @@ export function DashboardPage() {
 
       {/* KPI summary */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {[
-          {
-            label: 'Revenue (30d)',
-            value: kpi ? formatCurrency(kpi.revenue) : '—',
-            delta: kpi?.revenueDelta ?? '',
-            positive: isPositiveDelta(kpi?.revenueDelta),
-          },
-          {
-            label: 'Orders (30d)',
-            value: kpi?.orders.toLocaleString() ?? '—',
-            delta: kpi?.ordersDelta ?? '',
-            positive: isPositiveDelta(kpi?.ordersDelta),
-          },
-          {
-            label: 'Active partners',
-            value: kpi?.partners.toLocaleString() ?? '—',
-            delta: '',
-          },
-          {
-            label: 'Total customers',
-            value: kpi?.customers.toLocaleString() ?? '—',
-            delta: kpi ? `+${kpi.newCustomers} this month` : '',
-            positive: true,
-          },
-        ].map((item) => (
-          <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between text-sm text-slate-500">
-              <span>{item.label}</span>
-              {item.delta && (
-                <span className={`flex items-center gap-0.5 text-xs font-semibold ${item.positive ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {item.positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                  {item.delta}
-                </span>
-              )}
-            </div>
-            <div className="mt-4 text-3xl font-semibold text-slate-900 dark:text-slate-50">{item.value}</div>
-          </div>
-        ))}
+        <StatsCard
+          label="Revenue (30d)"
+          value={kpi ? formatCurrency(kpi.revenue) : '—'}
+          icon={CreditCard}
+          iconClassName="text-brand-600"
+          iconBgClassName="bg-brand-50 dark:bg-brand-950/40"
+          delta={kpi?.revenueDelta ?? ''}
+          deltaPositive={isPositiveDelta(kpi?.revenueDelta)}
+          loading={loading && !data}
+        />
+        <StatsCard
+          label="Orders (30d)"
+          value={kpi?.orders.toLocaleString() ?? '—'}
+          icon={ShoppingCart}
+          iconClassName="text-blue-600"
+          iconBgClassName="bg-blue-50 dark:bg-blue-950/40"
+          delta={kpi?.ordersDelta ?? ''}
+          deltaPositive={isPositiveDelta(kpi?.ordersDelta)}
+          loading={loading && !data}
+        />
+        <StatsCard
+          label="Active partners"
+          value={kpi?.partners.toLocaleString() ?? '—'}
+          icon={Building2}
+          iconClassName="text-amber-600"
+          iconBgClassName="bg-amber-50 dark:bg-amber-950/40"
+          loading={loading && !data}
+        />
+        <StatsCard
+          label="Total customers"
+          value={kpi?.customers.toLocaleString() ?? '—'}
+          icon={Users}
+          iconClassName="text-violet-600"
+          iconBgClassName="bg-violet-50 dark:bg-violet-950/40"
+          delta={kpi ? `+${kpi.newCustomers} this month` : ''}
+          deltaPositive
+          loading={loading && !data}
+        />
       </div>
 
       {/* Quick stats row */}
       {kpi && (
         <div className="grid gap-4 sm:grid-cols-3">
-          {[
-            { label: 'Refunds (30d)',    value: formatCurrency(kpi.refunds),      color: 'text-red-500' },
-            { label: 'Open tickets',     value: kpi.openTickets.toLocaleString(), color: 'text-amber-600' },
-            { label: 'New customers',    value: kpi.newCustomers.toLocaleString(), color: 'text-emerald-600' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <p className="text-sm text-slate-500">{label}</p>
-              <p className={`mt-2 text-2xl font-semibold ${color}`}>{value}</p>
-            </div>
-          ))}
+          <StatsCard
+            label="Refunds (30d)"
+            value={formatCurrency(kpi.refunds)}
+            delta=""
+            deltaPositive={false}
+          />
+          <StatsCard
+            label="Open tickets"
+            value={kpi.openTickets.toLocaleString()}
+          />
+          <StatsCard
+            label="New customers"
+            value={kpi.newCustomers.toLocaleString()}
+            delta={`+${kpi.newCustomers} this month`}
+            deltaPositive
+          />
         </div>
       )}
 
@@ -328,25 +329,41 @@ export function DashboardPage() {
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Recent orders</h2>
             <Link to="/orders" className="text-xs font-medium text-brand-600 hover:underline">See all</Link>
           </div>
-          {data?.recentOrders.length === 0 ? (
-            <p className="text-sm text-slate-400">No orders yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {(data?.recentOrders ?? []).map((o) => (
-                <div key={o.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{o.customerName}</p>
-                      <p className="text-xs text-slate-500">{formatCurrency(o.totalAmount)} · {timeAgo(o.createdAt)}</p>
-                    </div>
-                    <Badge variant={STATUS_BADGE[o.status] ?? 'default'} className="text-xs">
-                      {STATUS_LABEL[o.status] ?? o.status}
-                    </Badge>
+          <DataTable
+            columns={[
+              {
+                key: 'customer',
+                header: 'Customer',
+                cell: (o) => (
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{o.customerName}</p>
+                    <p className="text-xs text-slate-500">{timeAgo(o.createdAt)}</p>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ),
+              },
+              {
+                key: 'amount',
+                header: 'Amount',
+                cell: (o) => (
+                  <span className="text-sm font-medium">{formatCurrency(o.totalAmount)}</span>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                cell: (o) => (
+                  <Badge variant={STATUS_BADGE[o.status] ?? 'default'} className="text-xs">
+                    {STATUS_LABEL[o.status] ?? o.status}
+                  </Badge>
+                ),
+              },
+            ]}
+            data={data?.recentOrders ?? []}
+            keyExtractor={(o) => o.id}
+            loading={loading && !data}
+            emptyTitle="No recent orders"
+            skeletonRows={5}
+          />
         </div>
       </div>
 

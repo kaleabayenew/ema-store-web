@@ -3,6 +3,7 @@ import { Trash2, Edit, Loader2, Plus } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
@@ -380,25 +381,25 @@ export function AboutPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Content management</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">About Ema Store</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchContents} disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Refresh
-          </Button>
-          <Button onClick={() => {
-            setEditingContent(null)
-            setFormData(emptyForm())
-            setShowAddDialog(true)
-          }}>
-            Add Content
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Content management"
+        title="About Ema Store"
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchContents} disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Refresh
+            </Button>
+            <Button onClick={() => {
+              setEditingContent(null)
+              setFormData(emptyForm())
+              setShowAddDialog(true)
+            }}>
+              Add Content
+            </Button>
+          </>
+        }
+      />
 
       {error && (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400">

@@ -3,6 +3,7 @@ import { Wrench, CreditCard, Bell, FileText, Save, Shield, Lock } from 'lucide-r
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 const auditLogs = [
   { id: 'AL-001', admin: 'Aster Bekele',  action: 'PARTNER_APPROVED',  entity: 'Partner',  detail: 'Henok Organics approved',          time: '12 Jul, 14:22' },
@@ -41,12 +42,10 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">System configuration</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Settings</h1>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="System configuration"
+        title="Settings"
+      />
 
       <div className="grid gap-6 xl:grid-cols-[220px_1fr]">
         {/* Sidebar tabs */}

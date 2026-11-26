@@ -6,6 +6,9 @@ import {
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DataTable } from '@/components/ui/DataTable'
+import { FilterBar } from '@/components/ui/FilterBar'
+import { PageHeader } from '@/components/ui/PageHeader'
 import api from '@/lib/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -74,6 +77,8 @@ export function BalancePage() {
   const [entries, setEntries] = useState<BalanceEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [entrySearch, setEntrySearch] = useState('')
 
   // Breakdown popup state
   const [selectedCard, setSelectedCard] = useState<CardDef | null>(null)
@@ -185,17 +190,17 @@ export function BalancePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Ema Store finances</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Balance</h1>
-          <p className="mt-1 text-sm text-slate-500">Order money split between riders, partners and service charges. Tap a card for per-person details.</p>
-        </div>
-        <Button variant="outline" onClick={fetchBalance} disabled={loading}>
-          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Refresh
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Ema Store finances"
+        title="Balance"
+        description="Order money split between riders, partners and service charges. Tap a card for per-person details."
+        actions={
+          <Button variant="outline" onClick={fetchBalance} disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Refresh
+          </Button>
+        }
+      />
 
       {error && (
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900 dark:bg-red-950/30">
@@ -222,40 +227,60 @@ export function BalancePage() {
       </div>
 
       {/* Ledger */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Balance entries</h2>
-        </div>
-        {entries.length === 0 ? (
-          <div className="px-4 py-12 text-center text-sm text-slate-400">
-            No balance entries yet — the ledger will appear here once order money starts flowing.
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left dark:border-slate-800">
-                {['Entry', 'Party', 'Type', 'Amount', 'Date'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {entries.map((e) => (
-                <tr key={e.id} className="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{e.label}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{e.party}</td>
-                  <td className="px-4 py-3">
-                    <Badge variant={e.type === 'credit' ? 'success' : 'danger'}>{e.type}</Badge>
-                  </td>
-                  <td className={`px-4 py-3 font-semibold ${e.type === 'credit' ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {e.type === 'credit' ? '+' : '−'}{formatMoney(e.amountCents / 100)}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">{formatDate(e.createdAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <div className="space-y-3">
+        <h2 className="px-1 text-base font-semibold text-slate-900 dark:text-slate-100">Balance entries</h2>
+        <FilterBar
+          filters={[
+            { value: 'all', label: 'All', count: entries.length },
+            { value: 'credit', label: 'Credits', count: entries.filter((e) => e.type === 'credit').length },
+            { value: 'debit', label: 'Debits', count: entries.filter((e) => e.type === 'debit').length },
+          ]}
+          activeFilter={typeFilter}
+          onFilterChange={setTypeFilter}
+          search={entrySearch}
+          onSearchChange={setEntrySearch}
+          searchPlaceholder="Search entries…"
+        />
+        <DataTable
+          columns={[
+            {
+              key: 'label', header: 'Entry', sortable: true,
+              cell: (e) => <span className="font-medium text-slate-900 dark:text-slate-100">{e.label}</span>,
+            },
+            {
+              key: 'party', header: 'Party', sortable: true,
+              cell: (e) => <span className="text-slate-600 dark:text-slate-300">{e.party}</span>,
+            },
+            {
+              key: 'type', header: 'Type', sortable: true,
+              cell: (e) => <Badge variant={e.type === 'credit' ? 'success' : 'danger'}>{e.type}</Badge>,
+            },
+            {
+              key: 'amountCents', header: 'Amount', sortable: true,
+              cell: (e) => (
+                <span className={`font-semibold ${e.type === 'credit' ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {e.type === 'credit' ? '+' : '−'}{formatMoney(e.amountCents / 100)}
+                </span>
+              ),
+            },
+            {
+              key: 'createdAt', header: 'Date', sortable: true,
+              cell: (e) => <span className="text-slate-500">{formatDate(e.createdAt)}</span>,
+            },
+          ]}
+          data={entries.filter((e) => {
+            if (typeFilter !== 'all' && e.type !== typeFilter) return false
+            if (entrySearch) {
+              const q = entrySearch.toLowerCase()
+              if (!`${e.label} ${e.party}`.toLowerCase().includes(q)) return false
+            }
+            return true
+          })}
+          loading={loading}
+          keyExtractor={(e) => e.id}
+          emptyTitle="No balance entries yet"
+          emptyDescription="The ledger will appear here once order money starts flowing."
+        />
       </div>
 
       {/* Per-person breakdown popup */}

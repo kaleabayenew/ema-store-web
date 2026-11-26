@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 
 import { Input } from '@/components/ui/input'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { checkIntegration } from '@/services/integrationService'
 
 import { IntegrationCard } from './IntegrationCard'
@@ -81,24 +82,22 @@ export function IntegrationsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">System configuration</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            API
-          </h1>
-        </div>
-        <div className="relative w-full md:w-72">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search APIs or variables"
-            className="pl-9"
-            aria-label="Search APIs"
-          />
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="System configuration"
+        title="API"
+        actions={
+          <div className="relative w-full md:w-72">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search APIs or variables"
+              className="pl-9"
+              aria-label="Search APIs"
+            />
+          </div>
+        }
+      />
 
       {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">

@@ -6,6 +6,8 @@ import {
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { StatsCard } from '@/components/ui/StatsCard'
 import { useAlert, useConfirm } from '@/components/ui/ConfirmDialog'
 import { dateAfter, dateInFuture, maxLength, required, validate } from '@/lib/validate'
 import api from '@/lib/api'
@@ -276,39 +278,27 @@ export function BidControlPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Auction management</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Bid Control</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchBids} disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Refresh
-          </Button>
-          <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Add Bid</Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Auction management"
+        title="Bid Control"
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchBids} disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Refresh
+            </Button>
+            <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Add Bid</Button>
+          </>
+        }
+      />
 
       {/* Rules */}
       <BidRules />
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {[
-          { label: 'Total bids', value: total,                                           color: 'text-brand-600'   },
-          { label: 'Active',     value: bids.filter((b) => b.status === 'ACTIVE').length, color: 'text-emerald-600' },
-          { label: 'Drafts',     value: bids.filter((b) => b.status === 'DRAFT').length,  color: 'text-amber-600'   },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{label}</span>
-              <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 ${color}`}>
-                <Gavel className="h-4 w-4" />
-              </span>
-            </div>
-            <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-          </div>
-        ))}
+        <StatsCard label="Total bids" value={total} icon={Gavel} iconClassName="text-brand-600" loading={loading && bids.length === 0} />
+        <StatsCard label="Active" value={bids.filter((b) => b.status === 'ACTIVE').length} icon={Gavel} iconClassName="text-emerald-600" iconBgClassName="bg-emerald-50 dark:bg-emerald-950/40" loading={loading && bids.length === 0} />
+        <StatsCard label="Drafts" value={bids.filter((b) => b.status === 'DRAFT').length} icon={Gavel} iconClassName="text-amber-600" iconBgClassName="bg-amber-50 dark:bg-amber-950/40" loading={loading && bids.length === 0} />
       </div>
 
       {/* Bids table */}

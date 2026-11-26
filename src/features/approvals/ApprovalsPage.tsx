@@ -3,6 +3,9 @@ import { Building2, Boxes, CheckCircle2, XCircle, Loader2, Mail } from 'lucide-r
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { FilterBar } from '@/components/ui/FilterBar'
+import { PageHeader } from '@/components/ui/PageHeader'
+import { StatsCard } from '@/components/ui/StatsCard'
 import api from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
@@ -145,16 +148,16 @@ export function ApprovalsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Approvals queue</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Approvals</h1>
-        </div>
-        <Button variant="outline" onClick={fetchApprovals} disabled={loading}>
-          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Refresh
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Approvals queue"
+        title="Approvals"
+        actions={
+          <Button variant="outline" onClick={fetchApprovals} disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Refresh
+          </Button>
+        }
+      />
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
@@ -164,25 +167,20 @@ export function ApprovalsPage() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         {stats.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">{label}</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"><Icon className="h-4 w-4" /></span>
-            </div>
-            <p className="mt-4 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-          </div>
+          <StatsCard key={label} label={label} value={value} icon={Icon} iconClassName="text-amber-600" iconBgClassName="bg-amber-50 dark:bg-amber-950/40" loading={loading && items.length === 0} />
         ))}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-wrap gap-2 border-b border-slate-200 p-4 dark:border-slate-800">
-          {(['All', 'PARTNER', 'PRODUCT'] as const).map((f) => (
-            <button key={f} type="button" onClick={() => setFilter(f)}
-              className={`rounded-xl px-3 py-1.5 text-xs font-medium capitalize transition ${filter === f ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}>
-              {f === 'PARTNER' ? 'Partners' : f === 'PRODUCT' ? 'Products' : 'All'}
-            </button>
-          ))}
-        </div>
+        <FilterBar
+          filters={[
+            { value: 'All', label: 'All' },
+            { value: 'PARTNER', label: 'Partners' },
+            { value: 'PRODUCT', label: 'Products' },
+          ]}
+          activeFilter={filter}
+          onFilterChange={(v) => setFilter(v as typeof filter)}
+        />
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
           {loading ? (
             <div className="flex items-center justify-center py-16">

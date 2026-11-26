@@ -28,7 +28,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'relative flex h-full shrink-0 flex-col border-r border-slate-200 bg-white/90 backdrop-blur-sm transition-all duration-200 dark:border-slate-800 dark:bg-slate-950/90',
+        'relative flex h-full shrink-0 flex-col border-r border-slate-200 bg-gradient-to-b from-white to-slate-50/50 backdrop-blur-sm transition-all duration-200 dark:border-slate-800 dark:from-slate-950 dark:to-slate-950/95',
         isCollapsed ? 'w-20' : 'w-72',
       )}
     >
@@ -62,19 +62,6 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
             </svg>
           </button>
         )}
-
-        {isCollapsed && (
-          <button
-            type="button"
-            aria-label="Expand sidebar"
-            onClick={onToggle}
-            className="absolute left-14 top-4 z-50 rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        )}
       </div>
 
       {/* ── Nav ── */}
@@ -82,7 +69,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
         {visibleGroups.map((group) => (
           <div key={group.title} className="space-y-1">
             {!isCollapsed && (
-              <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+              <p className="px-2 pb-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
                 {group.title}
               </p>
             )}
@@ -98,15 +85,15 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                       'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
                       isCollapsed && 'justify-center px-2',
                       isActive
-                        ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200 dark:bg-brand-950/30 dark:text-brand-300 dark:ring-brand-900'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
+                        ? 'border-l-[3px] border-brand-600 bg-brand-600/[0.08] text-brand-700 ring-1 ring-brand-200 dark:bg-brand-950/30 dark:text-brand-300 dark:ring-brand-900'
+                        : 'border-l-[3px] border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
                     )
                   }
                 >
                   {({ isActive }) => (
                     <>
                       <Icon className={cn('h-[18px] w-[18px] shrink-0', isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300')} />
-                      {!isCollapsed && <span>{item.title}</span>}
+                      <span className={cn('overflow-hidden transition-all duration-150', isCollapsed ? 'w-0 opacity-0' : 'opacity-100')}>{item.title}</span>
                     </>
                   )}
                 </NavLink>
@@ -115,6 +102,22 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           </div>
         ))}
       </nav>
+
+      {/* ── Expand button (collapsed only) ── */}
+      {isCollapsed && (
+        <div className="shrink-0 border-t border-slate-200 py-2 dark:border-slate-800 flex justify-center">
+          <button
+            type="button"
+            aria-label="Expand sidebar"
+            onClick={onToggle}
+            className="rounded-lg border border-slate-200 p-1.5 text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* ── User chip ── */}
       <div className={cn(

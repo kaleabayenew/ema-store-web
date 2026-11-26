@@ -8,6 +8,7 @@ import api from '@/lib/api'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
@@ -465,38 +466,38 @@ export function CreditPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Finance</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Credits &amp; Wallets</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={showCoin ? 'default' : 'outline'}
-            onClick={() => setShowCoin((s) => !s)}
-          >
-            <Coins className="mr-2 h-4 w-4" />
-            Coin
-          </Button>
-          {isSuperAdmin && (
+      <PageHeader
+        eyebrow="Finance"
+        title="Credits & Wallets"
+        actions={
+          <>
             <Button
-              variant={showStuff ? 'default' : 'outline'}
-              onClick={() => setShowStuff((s) => !s)}
+              variant={showCoin ? 'default' : 'outline'}
+              onClick={() => setShowCoin((s) => !s)}
             >
-              <Package className="mr-2 h-4 w-4" />
-              Stuff
+              <Coins className="mr-2 h-4 w-4" />
+              Coin
             </Button>
-          )}
-          <Button
-            variant="outline"
-            onClick={() => { loadSummary(); if (view === 'users') { loadUsers() } else { loadTransactions() } }}
-            disabled={loading}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
+            {isSuperAdmin && (
+              <Button
+                variant={showStuff ? 'default' : 'outline'}
+                onClick={() => setShowStuff((s) => !s)}
+              >
+                <Package className="mr-2 h-4 w-4" />
+                Stuff
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => { loadSummary(); if (view === 'users') { loadUsers() } else { loadTransactions() } }}
+              disabled={loading}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </>
+        }
+      />
 
       {/* Platform-wide totals */}
       {summary && (
