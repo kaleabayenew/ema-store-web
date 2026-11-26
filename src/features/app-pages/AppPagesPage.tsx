@@ -37,7 +37,6 @@ const APP_META: Record<AppKind, { label: string; description: string; icon: type
 
 export function AppPagesPage({ app }: { app: AppKind }) {
   const meta = APP_META[app]
-  const Icon = meta.icon
   const [pages, setPages] = useState<AppPage[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Boxes, Package, Star, Search, Pencil, Trash2, Loader2, AlertCircle, ChevronLeft, ChevronRight, Eye, CheckCircle2 } from 'lucide-react'
+import { Boxes, Package, Star, Pencil, Trash2, Loader2, AlertCircle, ChevronLeft, ChevronRight, Eye, CheckCircle2 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

@@ -1,4 +1,4 @@
-import { CheckCircle2, MapPin, MoreHorizontal, Package, Search, Truck, Warehouse } from 'lucide-react'
+import { CheckCircle2, MapPin, MoreHorizontal, Package, Truck, Warehouse } from 'lucide-react'
 import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -8,10 +8,10 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { StatsCard } from '@/components/ui/StatsCard'
 
 const stats = [
-  { label: 'Active zones',      value: '8',    delta: '+1',     tone: 'info',    icon: MapPin },
-  { label: 'Deliveries today',  value: '412',  delta: '+18.4%', tone: 'success', icon: Truck },
-  { label: 'On-time rate',      value: '94.2%',delta: '+2.1%',  tone: 'success', icon: CheckCircle2 },
-  { label: 'Avg. delivery time',value: '42 min',delta: '-4m',   tone: 'success', icon: Package },
+  { label: 'Active zones',      value: '8',    delta: '+1',     icon: MapPin },
+  { label: 'Deliveries today',  value: '412',  delta: '+18.4%', icon: Truck },
+  { label: 'On-time rate',      value: '94.2%',delta: '+2.1%',  icon: CheckCircle2 },
+  { label: 'Avg. delivery time',value: '42 min',delta: '-4m',   icon: Package },
 ]
 
 const zones = [
@@ -59,7 +59,7 @@ export function DeliveryPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map(({ label, value, delta, tone, icon: Icon }) => (
+        {stats.map(({ label, value, delta, icon: Icon }) => (
           <StatsCard
             key={label}
             label={label}

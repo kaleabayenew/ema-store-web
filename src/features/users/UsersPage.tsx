@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Plus, Search, Shield, Loader2, RefreshCw,
+  Plus, Shield, Loader2, RefreshCw,
   Edit2, KeyRound, Ban, CheckCircle2, X,
 } from 'lucide-react'
 
