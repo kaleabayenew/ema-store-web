@@ -32,6 +32,7 @@ interface Bid {
   highestBid: number
   totalCollected: number
   winnerAmount?: number | null
+  winnerName?: string | null
   winner?: { name: string; phone: string; amount: number; final: boolean } | null
   entries?: BidEntry[]
   bidders?: BidderSummary[]
@@ -146,6 +147,11 @@ export function BidControlPage() {
   }, [])
 
   useEffect(() => { fetchBids() }, [fetchBids])
+
+  useEffect(() => {
+    const timer = setInterval(fetchBids, 30_000)
+    return () => clearInterval(timer)
+  }, [fetchBids])
 
   // Tick every second so the countdown column stays live.
   useEffect(() => {
@@ -295,10 +301,11 @@ export function BidControlPage() {
       <BidRules />
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatsCard label="Total bids" value={total} icon={Gavel} iconClassName="text-brand-600" loading={loading && bids.length === 0} />
         <StatsCard label="Active" value={bids.filter((b) => b.status === 'ACTIVE').length} icon={Gavel} iconClassName="text-emerald-600" iconBgClassName="bg-emerald-50 dark:bg-emerald-950/40" loading={loading && bids.length === 0} />
         <StatsCard label="Drafts" value={bids.filter((b) => b.status === 'DRAFT').length} icon={Gavel} iconClassName="text-amber-600" iconBgClassName="bg-amber-50 dark:bg-amber-950/40" loading={loading && bids.length === 0} />
+        <StatsCard label="Ended" value={bids.filter((b) => b.status === 'ENDED' || new Date(b.endsAt).getTime() <= now).length} icon={Trophy} iconClassName="text-violet-600" iconBgClassName="bg-violet-50 dark:bg-violet-950/30" loading={loading && bids.length === 0} />
       </div>
 
       {/* Bids table */}
@@ -317,7 +324,7 @@ export function BidControlPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left dark:border-slate-800">
-                  {['Bid', 'Bidders', 'Bids', 'Lowest unique', 'Ends', 'Time left', 'Status', 'Actions'].map((h) => (
+                  {['Bid', 'Bidders', 'Bids', 'Lowest unique', 'Winner', 'Ends', 'Time left', 'Status', 'Actions'].map((h) => (
                     <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{h}</th>
                   ))}
                 </tr>
@@ -325,7 +332,7 @@ export function BidControlPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {bids.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
                       <Gavel className="mx-auto mb-2 h-8 w-8" />
                       No bids yet. Click "Add Bid" to create one.
                     </td>
@@ -353,6 +360,16 @@ export function BidControlPage() {
                     <td className="px-4 py-3 font-semibold text-emerald-600 dark:text-emerald-400">
                       {b.winnerAmount != null ? money(b.winnerAmount) : '—'}
                     </td>
+                    <td className="px-4 py-3">
+                      {b.winnerName ? (
+                        <>
+                          <p className="max-w-[180px] truncate font-medium text-slate-800 dark:text-slate-100">{b.winnerName}</p>
+                          <p className="text-xs text-slate-400">{b.status === 'ENDED' || new Date(b.endsAt).getTime() <= now ? 'Winner' : 'Leading'}</p>
+                        </>
+                      ) : (
+                        <span className="text-xs text-slate-400">{b.status === 'ENDED' || new Date(b.endsAt).getTime() <= now ? 'No winner' : '—'}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-xs text-slate-500">{new Date(b.endsAt).toLocaleString()}</td>
                     <td className="px-4 py-3">
                       {(() => {
@@ -372,8 +389,8 @@ export function BidControlPage() {
                       })()}
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant={b.status === 'ACTIVE' ? 'success' : b.status === 'DRAFT' ? 'warning' : 'default'}>
-                        {b.status}
+                      <Badge variant={b.status === 'ACTIVE' && new Date(b.endsAt).getTime() > now ? 'success' : b.status === 'DRAFT' && new Date(b.endsAt).getTime() > now ? 'warning' : 'default'}>
+                        {b.status === 'ENDED' || new Date(b.endsAt).getTime() <= now ? 'ENDED' : b.status}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">

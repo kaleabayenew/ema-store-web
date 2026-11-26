@@ -3,9 +3,12 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { api } from './lib/api'
+import { applyTheme, getSavedTheme } from './lib/theme'
 
 // Render immediately — never block first paint on a backend health check.
 // The check runs in the background to warm up a sleeping Render instance.
+applyTheme(getSavedTheme())
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

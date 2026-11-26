@@ -32,7 +32,7 @@ interface DashboardData {
   }
   salesChart:   { name: string; revenue: number; orders: number }[]
   orderMix:     { name: string; value: number }[]
-  cityData:     { city: string; orders: number }[]
+  cityData:     { area: string; orders: number }[]
   topProducts:  { name: string; sold: number }[]
   topPartners:  { name: string; sales: number }[]
   recentOrders: { id: string; status: string; totalAmount: number; customerName: string; createdAt: string }[]
@@ -57,8 +57,8 @@ function timeAgo(iso: string) {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  DELIVERED: '#1B9B5A', PLACED: '#3B82F6', CONFIRMED: '#3B82F6',
-  PROCESSING: '#F5B700', PACKED: '#F5B700', SHIPPED: '#8B5CF6',
+  DELIVERED: '#2BAE66', PLACED: '#3B82F6', CONFIRMED: '#3B82F6',
+  PROCESSING: '#F5A623', PACKED: '#F5A623', SHIPPED: '#8B5CF6',
   IN_TRANSIT: '#8B5CF6', CANCELLED: '#D93025', REFUNDED: '#D93025',
 }
 
@@ -148,7 +148,7 @@ export function DashboardPage() {
 
       {error && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">
-          {error} — showing last data.
+          {error}{data ? ' — showing last data.' : ''}
         </div>
       )}
 
@@ -255,15 +255,15 @@ export function DashboardPage() {
               <AreaChart data={data?.salesChart ?? []}>
                 <defs>
                   <linearGradient id="revenue" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="5%"  stopColor="#1B9B5A" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#1B9B5A" stopOpacity={0.03} />
+                    <stop offset="5%"  stopColor="#2BAE66" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#2BAE66" stopOpacity={0.03} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} />
                 <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
                 <Tooltip formatter={(v) => formatCurrency(Number(v ?? 0))} />
-                <Area type="monotone" dataKey="revenue" stroke="#1B9B5A" fill="url(#revenue)" strokeWidth={3} />
+                <Area type="monotone" dataKey="revenue" stroke="#2BAE66" fill="url(#revenue)" strokeWidth={3} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -307,17 +307,17 @@ export function DashboardPage() {
 
       {/* City bar + Recent orders */}
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        {/* Orders by city */}
+        {/* Orders by delivery area */}
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Orders by location</h2>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Orders by delivery area</h2>
           <div className="mt-4 h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data?.cityData ?? []}>
                 <CartesianGrid vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="city" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                <XAxis dataKey="area" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                 <YAxis tickLine={false} axisLine={false} />
                 <Tooltip />
-                <Bar dataKey="orders" radius={[8, 8, 0, 0]} fill="#F5B700" />
+                <Bar dataKey="orders" radius={[8, 8, 0, 0]} fill="#F5A623" />
               </BarChart>
             </ResponsiveContainer>
           </div>

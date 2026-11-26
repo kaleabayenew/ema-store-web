@@ -6,20 +6,24 @@
 
 :root {
   color-scheme: light;
-  --brand-50: #edf9f2;
-  --brand-100: #d8f1e4;
-  --brand-500: #1b9b5a;
-  --brand-600: #16814d;
-  --brand-700: #0f6b3d;
-  --brand-950: rgba(27, 155, 90, 0.12);
-  --yellow-500: #f5b700;
+  --brand-50: #eff9f3;
+  --brand-100: #dcf2e5;
+  --brand-500: #2bae66;
+  --brand-600: #217a46;
+  --brand-700: #195f39;
+  --brand-950: rgba(43, 174, 102, 0.12);
+  --yellow-500: #f5a623;
   --warning-500: #f59e0b;
   --danger-500: #d93025;
-  --surface: #f8fafc;
+  --surface: #f7faf8;
+  --app-background: #f7faf8;
+  --app-text: #1a2520;
 }
 
 .dark {
   color-scheme: dark;
+  --app-background: #111b15;
+  --app-text: #f2f7f3;
 }
 
 html {
@@ -30,8 +34,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--app-background);
+  color: var(--app-text);
 }
 
 #root {
@@ -44,7 +48,7 @@ body {
   }
 
   body {
-    @apply bg-slate-100 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+    @apply antialiased;
   }
 
   a {
@@ -87,50 +91,50 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-left: 1px solid #e2e8f0;
+  background: #eef4ef;
+  border-left: 1px solid #dde8e0;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #64748b;
+  background: #66766b;
   border-radius: 0;
-  border: 3px solid #f1f5f9;
+  border: 3px solid #eef4ef;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #4b5a50;
 }
 
 ::-webkit-scrollbar-thumb:active {
-  background: #334155;
+  background: #35433a;
 }
 
 /* Firefox scrollbar */
 * {
   scrollbar-width: auto;
-  scrollbar-color: #64748b #f1f5f9;
+  scrollbar-color: #66766b #eef4ef;
 }
 
 /* Dark mode scrollbar */
 .dark ::-webkit-scrollbar-track {
-  background: #1e293b;
-  border-left: 1px solid #334155;
+  background: #1a2520;
+  border-left: 1px solid #26342a;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border: 3px solid #1e293b;
+  background: #96a69b;
+  border: 3px solid #1a2520;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
+  background: #c4d3c8;
 }
 
 .dark ::-webkit-scrollbar-thumb:active {
-  background: #e2e8f0;
+  background: #dde8e0;
 }
 
 .dark * {
-  scrollbar-color: #94a3b8 #1e293b;
+  scrollbar-color: #96a69b #1a2520;
 }

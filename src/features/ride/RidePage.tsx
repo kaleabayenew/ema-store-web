@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Bike, CheckCircle2, Clock, Copy, Eye, KeyRound, Loader2, MapPin, MoreHorizontal,
-  Phone, Plus, RefreshCw, Search, UserX, UserCheck, AlertCircle,
+  Bike, CheckCircle2, ChevronLeft, ChevronRight, Clock, Copy, Eye, History,
+  KeyRound, Loader2, MapPin, MoreHorizontal, Phone, Plus, RefreshCw, Search,
+  UserX, UserCheck, AlertCircle,
 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -18,6 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAlert } from '@/components/ui/ConfirmDialog'
 import api from '@/lib/api'
+import { apiErrorMessage } from '@/lib/errors'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -51,6 +53,21 @@ type StatusFilter = 'All' | 'ONLINE' | 'ACTIVE' | 'INACTIVE' | 'ON_DELIVERY'
 function formatDate(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-ET', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function formatDateTime(iso: string | null) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('en-ET', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatMoney(amount: number) {
+  return `ETB ${amount.toLocaleString('en-ET', { maximumFractionDigits: 2 })}`
 }
 
 function timeAgo(iso: string | null) {
@@ -89,6 +106,8 @@ export function RidePage() {
   const [filter, setFilter]   = useState<StatusFilter>('All')
   const [showAdd, setShowAdd] = useState(false)
   const [viewAgent, setViewAgent]     = useState<RideAgent | null>(null)
+  const [deliveryAgent, setDeliveryAgent] = useState<RideAgent | null>(null)
+  const [historyAgent, setHistoryAgent] = useState<RideAgent | null>(null)
   const [resetAgent, setResetAgent]   = useState<RideAgent | null>(null)
   const [tab, setTab]                 = useState<'riders' | 'fees'>('riders')
 
@@ -266,7 +285,7 @@ export function RidePage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left dark:border-slate-800">
-                {['Rider', 'Agent code', 'Phone', 'Deliveries', 'Today', 'Last delivery', 'Status', ''].map((h) => (
+                {['Rider', 'Agent code', 'Phone', 'Completed', 'Active deliveries', 'Today', 'Last delivery', 'Status', 'History', ''].map((h) => (
                   <th key={h} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{h}</th>
                 ))}
               </tr>
@@ -293,6 +312,17 @@ export function RidePage() {
                     </td>
                     <td className="px-4 py-3"><span className="flex items-center gap-1 text-slate-500"><Phone className="h-3 w-3" />{a.phone ?? '—'}</span></td>
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{a.completedDeliveries}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryAgent(a)}
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-950/40"
+                        aria-label={`View ${a.activeDeliveries} active deliveries for ${a.fullName}`}
+                      >
+                        <MapPin className="h-3.5 w-3.5" />
+                        {a.activeDeliveries}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{a.deliveriesToday}</td>
                     <td className="px-4 py-3 text-slate-500">{formatDate(a.lastDeliveryAt)}</td>
                     <td className="px-4 py-3">
@@ -303,6 +333,17 @@ export function RidePage() {
                       <p className="mt-1 text-[11px] text-slate-400">
                         {a.isOnline ? 'Live now' : `Last seen ${timeAgo(a.lastLocationAt)}`}
                       </p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setHistoryAgent(a)}
+                        title={`View ${a.fullName}'s delivery history`}
+                        aria-label={`View ${a.fullName}'s delivery history`}
+                      >
+                        <History className="h-4 w-4" />
+                      </Button>
                     </td>
                     <td className="px-4 py-3">
                       <DropdownMenu>
@@ -332,7 +373,7 @@ export function RidePage() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-400">
+                  <td colSpan={10} className="px-4 py-10 text-center text-sm text-slate-400">
                     {agents.length === 0 ? 'No riders yet — click "Add rider" to register one.' : 'No riders match your filters.'}
                   </td>
                 </tr>
@@ -356,6 +397,22 @@ export function RidePage() {
       {/* ── Rider details modal ── */}
       {viewAgent && (
         <RiderDetailsModal agent={viewAgent} onClose={() => setViewAgent(null)} />
+      )}
+
+      {deliveryAgent && (
+        <RiderDeliveriesModal
+          agent={deliveryAgent}
+          type="active"
+          onClose={() => setDeliveryAgent(null)}
+        />
+      )}
+
+      {historyAgent && (
+        <RiderDeliveriesModal
+          agent={historyAgent}
+          type="history"
+          onClose={() => setHistoryAgent(null)}
+        />
       )}
 
       {/* ── Reset password modal ── */}
@@ -463,16 +520,214 @@ interface AgentDetails {
 
 // ── Shared bits ───────────────────────────────────────────────────────────────
 
-function ModalShell({ children, onClose, wide }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) {
+function ModalShell({
+  children,
+  onClose,
+  wide,
+  extraWide,
+}: {
+  children: React.ReactNode
+  onClose: () => void
+  wide?: boolean
+  extraWide?: boolean
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
       <div
-        className={`w-full ${wide ? 'max-w-lg' : 'max-w-md'} max-h-[90vh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl dark:bg-slate-900 sm:rounded-2xl`}
+        className={`w-full ${extraWide ? 'max-w-5xl' : wide ? 'max-w-lg' : 'max-w-md'} max-h-[90vh] overflow-y-auto rounded-t-3xl bg-white shadow-2xl dark:bg-slate-900 sm:rounded-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
         {children}
       </div>
     </div>
+  )
+}
+
+interface RiderDelivery {
+  id: string
+  orderNumber: string
+  status: string
+  totalAmount: number
+  shippingAddress: string
+  customerName: string
+  itemCount: number
+  createdAt: string
+  deliveredAt: string | null
+}
+
+type RiderDeliveryType = 'active' | 'history'
+
+const deliveryStatusVariant: Record<string, 'success' | 'warning' | 'info' | 'danger' | 'default'> = {
+  DELIVERED: 'success',
+  COMPLETED: 'success',
+  CANCELLED: 'danger',
+  REFUNDED: 'danger',
+  PROCESSING: 'warning',
+  PACKED: 'warning',
+  CONFIRMED: 'info',
+  SHIPPED: 'info',
+  IN_TRANSIT: 'info',
+}
+
+function RiderDeliveriesModal({
+  agent,
+  type,
+  onClose,
+}: {
+  agent: RideAgent
+  type: RiderDeliveryType
+  onClose: () => void
+}) {
+  const [deliveries, setDeliveries] = useState<RiderDelivery[]>([])
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchDeliveries = useCallback(async (showLoading: boolean) => {
+    if (showLoading) setLoading(true)
+    setError(null)
+    try {
+      const res = await api.get(`/admin/agents/${agent.id}/deliveries`, {
+        params: { type, page, limit: 10 },
+      })
+      const result = res.data
+      const nextTotalPages = Math.max(1, Number(result.totalPages) || 1)
+      setDeliveries(result.deliveries ?? [])
+      setTotal(Number(result.total) || 0)
+      setTotalPages(nextTotalPages)
+      setPage((current) => Math.min(current, nextTotalPages))
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Failed to load rider deliveries'))
+    } finally {
+      if (showLoading) setLoading(false)
+    }
+  }, [agent.id, page, type])
+
+  useEffect(() => {
+    void fetchDeliveries(true)
+    if (type !== 'active') return
+    const timer = setInterval(() => { void fetchDeliveries(false) }, 10000)
+    return () => clearInterval(timer)
+  }, [fetchDeliveries, type])
+
+  const isHistory = type === 'history'
+  const title = isHistory ? 'Delivery history' : 'Active deliveries'
+  const start = total === 0 ? 0 : (page - 1) * 10 + 1
+  const end = Math.min(page * 10, total)
+
+  return (
+    <ModalShell onClose={onClose} extraWide>
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 p-5 dark:border-slate-800">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{title}</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {agent.fullName} · {agent.agentCode}
+            {!isHistory && ' · Live updates every 10 seconds'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void fetchDeliveries(true)}
+            disabled={loading}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mx-5 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+          {error}
+        </div>
+      )}
+
+      {loading && deliveries.length === 0 ? (
+        <div className="flex items-center justify-center gap-3 py-16 text-sm text-slate-500">
+          <Loader2 className="h-5 w-5 animate-spin text-brand-600" />
+          Loading {isHistory ? 'delivery history' : 'active deliveries'}…
+        </div>
+      ) : deliveries.length === 0 ? (
+        <div className="py-16 text-center text-sm text-slate-500">
+          {isHistory ? 'No delivery history found for this rider.' : 'This rider has no active deliveries.'}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-[900px] w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left dark:border-slate-800">
+                {['Order', 'Customer', 'Delivery address', 'Items', 'Amount', 'Status', isHistory ? 'Delivered' : 'Created'].map((heading) => (
+                  <th key={heading} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {deliveries.map((delivery) => (
+                <tr key={delivery.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                  <td className="px-4 py-3 font-mono text-xs font-semibold text-brand-700 dark:text-brand-300">
+                    {delivery.orderNumber}
+                  </td>
+                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
+                    {delivery.customerName}
+                  </td>
+                  <td className="max-w-[260px] px-4 py-3 text-slate-500" title={delivery.shippingAddress}>
+                    <span className="block truncate">{delivery.shippingAddress}</span>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{delivery.itemCount}</td>
+                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
+                    {formatMoney(delivery.totalAmount)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant={deliveryStatusVariant[delivery.status] ?? 'default'}>
+                      {delivery.status.replaceAll('_', ' ')}
+                    </Badge>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">
+                    {formatDateTime(isHistory ? delivery.deliveredAt ?? delivery.createdAt : delivery.createdAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 dark:border-slate-800">
+        <p className="text-sm text-slate-500">
+          Showing {start}–{end} of {total} {isHistory ? 'deliveries' : 'active deliveries'}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            disabled={page <= 1 || loading}
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="min-w-16 text-center text-sm text-slate-500">
+            {page} / {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+            disabled={page >= totalPages || loading}
+            aria-label="Next page"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </ModalShell>
   )
 }
 

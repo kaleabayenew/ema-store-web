@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Building2, Boxes, CheckCircle2, XCircle, Loader2, Mail } from 'lucide-react'
+import { Building2, Boxes, CheckCircle2, XCircle, Loader2, Mail, Bike, UserRound } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,22 @@ interface ApprovalItem {
   stock?: number | null
   imageUrl?: string | null
   detail: ApprovalDetail
+}
+
+interface ProfileRequest {
+  id: string
+  status: string
+  fields: Record<string, string>
+  reviewerNote: string | null
+  createdAt: string | null
+  agent: { id: string; agentCode: string; name: string; phone: string }
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  full_name: 'Full name', phone: 'Phone', emergency_contact: 'Emergency contact',
+  emergency_national_id: 'Emergency national ID', license_number: 'License number',
+  vehicle_type: 'Vehicle type', plate_number: 'Plate number',
+  photo_url: 'Photo URL', sub_city: 'Sub-city',
 }
 
 function formatDate(d: string | null | undefined) {
@@ -64,17 +80,35 @@ export function ApprovalsPage() {
   const [actionResult, setActionResult] = useState<string | null>(null)
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const [profileRequests, setProfileRequests] = useState<ProfileRequest[]>([])
+  const [prActing, setPrActing] = useState<string | null>(null)
 
   const fetchApprovals = async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await api.get<{ partners: ApprovalItem[]; products: ApprovalItem[] }>('/admin/approvals')
+      const [res, prRes] = await Promise.all([
+        api.get<{ partners: ApprovalItem[]; products: ApprovalItem[] }>('/admin/approvals'),
+        api.get<{ requests: ProfileRequest[] }>('/admin/agents/profile-requests?status=PENDING').catch(() => ({ data: { requests: [] as ProfileRequest[] } })),
+      ])
       setItems([...(res.data.partners ?? []), ...(res.data.products ?? [])])
+      setProfileRequests(prRes.data.requests ?? [])
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Failed to load approvals')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const reviewProfileRequest = async (id: string, approve: boolean, note?: string) => {
+    setPrActing(id)
+    try {
+      await api.post(`/admin/agents/profile-requests/${id}/review`, { approve, note })
+      setProfileRequests((prev) => prev.filter((r) => r.id !== id))
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? 'Action failed')
+    } finally {
+      setPrActing(null)
     }
   }
 
@@ -218,6 +252,50 @@ export function ApprovalsPage() {
           ))}
         </div>
       </div>
+
+      {/* Rider profile change requests */}
+      {profileRequests.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+            <Bike className="h-5 w-5 text-brand-600" />
+            <h2 className="font-semibold text-slate-900 dark:text-slate-100">Rider profile changes</h2>
+            <Badge variant="warning" className="ml-auto">{profileRequests.length}</Badge>
+          </div>
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {profileRequests.map((req) => (
+              <div key={req.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-950/40">
+                    <UserRound className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-900 dark:text-slate-100">
+                      {req.agent.name} <span className="text-xs font-normal text-slate-400">({req.agent.agentCode} · {req.agent.phone})</span>
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {Object.entries(req.fields)
+                        .map(([k, v]) => `${FIELD_LABELS[k] ?? k}: ${k === 'photo_url' ? 'new photo' : v}`)
+                        .join(' · ')}
+                      {req.createdAt ? ` · ${formatDate(req.createdAt)}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-shrink-0 gap-2">
+                  <Button size="sm" className="gap-1.5 bg-brand-600 hover:bg-brand-700" disabled={prActing === req.id}
+                    onClick={() => reviewProfileRequest(req.id, true)}>
+                    {prActing === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}Approve
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
+                    disabled={prActing === req.id}
+                    onClick={() => reviewProfileRequest(req.id, false, 'Rejected by admin')}>
+                    <XCircle className="h-3.5 w-3.5" />Reject
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Detail popup */}
       {selected && (

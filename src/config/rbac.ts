@@ -10,6 +10,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   '/products': ['SUPER_ADMIN', 'MANAGEMENT', 'PRODUCT_MANAGER'],
   '/orders': ['SUPER_ADMIN', 'MANAGEMENT', 'PRODUCT_MANAGER', 'FINANCE'],
   '/ride': ['SUPER_ADMIN', 'MANAGEMENT'],
+  '/locations': ['SUPER_ADMIN', 'ADMIN', 'MANAGEMENT'],
   '/marketing': ['SUPER_ADMIN', 'MANAGEMENT'],
   '/flash-deals': ['SUPER_ADMIN', 'MANAGEMENT', 'MARKETING'],
   '/bids': ['SUPER_ADMIN', 'MANAGEMENT'],
@@ -50,7 +51,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
 export const ROLE_PERMISSIONS: Record<Role, string[]> = {
   SUPER_ADMIN: ['*'],
   ADMIN: ['*'],
-  MANAGEMENT: ['dashboard', 'customers', 'partners', 'products', 'orders', 'ride', 'marketing', 'flash-deals', 'seasonal-promotions', 'banners', 'notifications', 'support'],
+  MANAGEMENT: ['dashboard', 'customers', 'partners', 'products', 'orders', 'ride', 'locations', 'marketing', 'flash-deals', 'seasonal-promotions', 'banners', 'notifications', 'support'],
   MANAGER: ['dashboard', 'customers', 'partners', 'products', 'orders', 'ride', 'marketing', 'flash-deals', 'seasonal-promotions', 'banners', 'notifications', 'support'],
   CUSTOMER_SUPPORT: ['dashboard', 'customers', 'support'],
   PARTNER_MANAGER: ['dashboard', 'partners', 'reports', 'approvals'],

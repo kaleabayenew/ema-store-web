@@ -25,10 +25,10 @@ const categoryData = [
 ]
 
 const orderMix = [
-  { name: 'Delivered',  value: 76, color: '#1B9B5A' },
+  { name: 'Delivered',  value: 76, color: '#2BAE66' },
   { name: 'In transit', value: 13, color: '#3B82F6' },
   { name: 'Cancelled',  value: 7,  color: '#D93025' },
-  { name: 'Pending',    value: 4,  color: '#F5B700' },
+  { name: 'Pending',    value: 4,  color: '#F5A623' },
 ]
 
 const subCityData = [
@@ -87,15 +87,15 @@ export function ReportsPage() {
               <AreaChart data={revenueData}>
                 <defs>
                   <linearGradient id="rev" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="5%" stopColor="#1B9B5A" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#1B9B5A" stopOpacity={0.02} />
+                    <stop offset="5%" stopColor="#2BAE66" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#2BAE66" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} />
                 <YAxis tickLine={false} axisLine={false} />
                 <Tooltip />
-                <Area type="monotone" dataKey="revenue" stroke="#1B9B5A" fill="url(#rev)" strokeWidth={2.5} />
+                <Area type="monotone" dataKey="revenue" stroke="#2BAE66" fill="url(#rev)" strokeWidth={2.5} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -135,7 +135,7 @@ export function ReportsPage() {
                 <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                 <YAxis tickLine={false} axisLine={false} />
                 <Tooltip />
-                <Bar dataKey="orders" radius={[8, 8, 0, 0]} fill="#1B9B5A" />
+                <Bar dataKey="orders" radius={[8, 8, 0, 0]} fill="#2BAE66" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -150,7 +150,7 @@ export function ReportsPage() {
                 <XAxis dataKey="city" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                 <YAxis tickLine={false} axisLine={false} />
                 <Tooltip />
-                <Bar dataKey="orders" radius={[8, 8, 0, 0]} fill="#F5B700" />
+                <Bar dataKey="orders" radius={[8, 8, 0, 0]} fill="#F5A623" />
               </BarChart>
             </ResponsiveContainer>
           </div>

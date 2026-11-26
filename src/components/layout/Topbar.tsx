@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import api from '@/lib/api'
 import { ROLE_COLORS, ROLE_LABELS } from '@/config/rbac'
 import { useAuthStore } from '@/store/authStore'
+import { applyTheme, getSavedTheme, saveTheme } from '@/lib/theme'
 import type { Role } from '@/types/auth'
 
 interface TopbarNotification {
@@ -31,7 +32,7 @@ function timeAgo(iso: string) {
 interface TopbarProps { onSidebarToggle: () => void }
 
 export function Topbar({ onSidebarToggle }: TopbarProps) {
-  const [darkMode, setDarkMode] = useState(false)
+  const [darkMode, setDarkMode] = useState(() => getSavedTheme() === 'dark')
   const [notifications, setNotifications] = useState<TopbarNotification[]>([])
   const [notifOpen, setNotifOpen] = useState(false)
   const [badgePulse, setBadgePulse] = useState(false)
@@ -81,7 +82,9 @@ export function Topbar({ onSidebarToggle }: TopbarProps) {
   const initial = user?.name?.charAt(0).toUpperCase() ?? 'A'
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode)
+    const theme = darkMode ? 'dark' : 'light'
+    applyTheme(theme)
+    saveTheme(theme)
   }, [darkMode])
 
   return (
@@ -110,7 +113,13 @@ export function Topbar({ onSidebarToggle }: TopbarProps) {
             <span className="hidden sm:inline">EN</span>
           </Button>
 
-          <Button variant="outline" size="icon" aria-label="Toggle theme" onClick={() => setDarkMode((p) => !p)}>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-pressed={darkMode}
+            onClick={() => setDarkMode((p) => !p)}
+          >
             {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
 

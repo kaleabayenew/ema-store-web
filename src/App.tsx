@@ -18,14 +18,17 @@ import { OtpPage } from './features/auth/OtpPage'
 import { BidControlPage } from './features/bids/BidControlPage'
 import { PaymentBannersPage } from './features/banners/PaymentBannersPage'
 import { CustomersPage } from './features/customers/CustomersPage'
+import { ContactPage } from './features/contact/ContactPage'
 import { CreditPage } from './features/credits/CreditPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { DeliveryPage } from './features/delivery/DeliveryPage'
+import { OverduePage } from './features/delivery/OverduePage'
 import { FinancePage } from './features/finance/FinancePage'
 import { FeedbackPage } from './features/feedback/FeedbackPage'
 import { FlashDealsPage } from './features/flash-deals/FlashDealsPage'
 import { IntegrationsPage } from './features/integrations/IntegrationsPage'
 import { MarketingPage } from './features/marketing/MarketingPage'
+import { LocationsMapPage } from './features/locations/LocationsMapPage'
 import { NotificationsPage } from './features/notifications/NotificationsPage'
 import { OrdersPage } from './features/orders/OrdersPage'
 import { PartnersPage } from './features/partners/PartnersPage'
@@ -92,12 +95,15 @@ function App() {
             <Route path="/products"  element={<ProductsPage />} />
             <Route path="/orders"    element={<OrdersPage />} />
             <Route path="/ride"      element={<RidePage />} />
+            <Route path="/locations" element={<LocationsMapPage />} />
             <Route path="/marketing" element={<MarketingPage />} />
             <Route path="/flash-deals" element={<FlashDealsPage />} />
             <Route path="/seasonal-promotions" element={<SeasonalPromotionsPage />} />
             <Route path="/bids" element={<BidControlPage />} />
             <Route path="/support"   element={<SupportPage />} />
+            <Route path="/contact"   element={<ContactPage />} />
             <Route path="/delivery"  element={<DeliveryPage />} />
+            <Route path="/delivery/overdue" element={<OverduePage />} />
             <Route path="/finance"   element={<FinancePage />} />
             <Route path="/balance"   element={<BalancePage />} />
             <Route path="/credits"   element={<CreditPage />} />
